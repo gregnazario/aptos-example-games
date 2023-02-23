@@ -102,3 +102,16 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Move build files
+build/
+
+# Aptos CLI files
+.aptos/
+
+# Idea files
+.idea/
+
+# Swap files
+*.swo
+*.swp
