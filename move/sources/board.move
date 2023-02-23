@@ -25,6 +25,7 @@ module deploy_account::boardgame {
     ///
     /// This allows for varying adjacency schemes of squares on the board.
     public fun get_space<T: drop + copy + store>(board: &Board<T>, index: u64): T {
+        assert!(index < vector::length(&board.spaces), EOUT_OF_BOUNDS);
         *vector::borrow(&board.spaces, index)
     }
 
