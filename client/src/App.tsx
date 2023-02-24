@@ -3,7 +3,7 @@ import { WalletSelector } from "@aptos-labs/wallet-adapter-ant-design";
 import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
 import { AptosClient } from "aptos";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import {ChangeEvent, useEffect, useState} from "react";
+import {ChangeEvent, useState} from "react";
 
 // TODO: Load from wallet
 export const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
@@ -56,24 +56,24 @@ function App() {
                 function: `${moduleAddress}::tic_tac_toe::winner`,
                 type_arguments: []
             });
-            const player_num = player[0];
+            const player_num = player[0] as number;
             let player_address = "";
             let player_symbol = "";
             let type: "success"|"warning"|"error" = "warning"
-            if (player_num == 1) {
+            if (player_num === 1) {
                 player_symbol = "X"
                 player_address = player[1].toString();
                 setGameOver(true);
-            } else if (player_num == 2) {
+            } else if (player_num === 2) {
                 player_symbol = "O"
                 player_address = player[1].toString();
                 setGameOver(true);
-            } else if (player_num == 3) {
+            } else if (player_num === 3) {
                 player_symbol = "Draw"
                 setGameOver(true);
             }
 
-            if (player_address == account?.address) {
+            if (player_address === account?.address) {
                 type = "success"
             } else {
                 type = "error"
@@ -93,13 +93,13 @@ function App() {
         try {
             const result = await client.view({arguments: [gameAddress], function: `${moduleAddress}::tic_tac_toe::get_board`, type_arguments: []});
             const current_player = await client.view({arguments: [gameAddress], function: `${moduleAddress}::tic_tac_toe::current_player`, type_arguments: []});
-            const player_num = current_player[0];
+            const player_num = current_player[0] as number;
             let player_address = "";
             let player_symbol = "";
-             if (player_num == 1) {
+             if (player_num === 1) {
                  player_symbol = "X"
                  player_address = current_player[1].toString();
-             } else if (player_num == 2) {
+             } else if (player_num === 2) {
                  player_symbol = "O"
                  player_address = current_player[1].toString();
              }
@@ -109,11 +109,11 @@ function App() {
              let index = 0;
             for (let i = 2; i < board.length; i+=2) {
                 const symbol_num = board[i+1] as unknown as number
-                if (symbol_num == 0) {
+                if (symbol_num === 0) {
                     layout[index] = " ";
-                } else if (symbol_num == 1) {
+                } else if (symbol_num === 1) {
                     layout[index] = "X";
-                } else if (symbol_num == 2) {
+                } else if (symbol_num === 2) {
                     layout[index] = "O";
                 }
                 index++;
@@ -361,7 +361,7 @@ function App() {
                                 </Button>
                             </Col>
                         }
-                        {gameOver && gameAddress == account?.address &&
+                        {gameOver && gameAddress === account?.address &&
                             <Col span={8} offset={8}>
                                 <Button onClick={deleteGame} block type="primary" style={{ height: "40px", backgroundColor: "#3f67ff" }}>
                                     Delete game (only the game account can)
