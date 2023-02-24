@@ -5,8 +5,8 @@ import { AptosClient } from "aptos";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import {ChangeEvent, useState} from "react";
 
-// TODO: Load from wallet
-export const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
+// TODO: Load URL from wallet
+export const NODE_URL = "https://fullnode.testnet.aptoslabs.com";
 export const client = new AptosClient(NODE_URL);
 // TODO: make this more accessible / be deployed by others?
 export const moduleAddress = "0x9b6adab7156c48f2f9ed9b5ab783a8c1d550b4130d409d9b1832931c38e4c845";
@@ -22,7 +22,7 @@ function App() {
     const [currentPlayer, setCurrentPlayer] = useState<{symbol: string, address: string}>({symbol: "", address: ""});
     const [winner, setWinner] = useState<{symbol: string, address: string, alert_type: "success" | "warning" | "error"}>({symbol: "", address: "", alert_type: "warning"});
     const [board, setBoard] = useState<string[]>(["","","","","","","","",""]);
-    const { account, signAndSubmitTransaction } = useWallet();
+    const { account, network, connected, signAndSubmitTransaction } = useWallet();
 
     const onChangeGameAddress = async(event: ChangeEvent<HTMLInputElement>) => {
         // Ensure you're logged in
@@ -108,12 +108,12 @@ function App() {
              let board = result[0] as string;
              let index = 0;
             for (let i = 2; i < board.length; i+=2) {
-                const symbol_num = board[i+1] as unknown as number
-                if (symbol_num === 0) {
+                const symbol_num = board[i+1]
+                if (symbol_num === "0") {
                     layout[index] = " ";
-                } else if (symbol_num === 1) {
+                } else if (symbol_num === "1") {
                     layout[index] = "X";
-                } else if (symbol_num === 2) {
+                } else if (symbol_num === "2") {
                     layout[index] = "O";
                 }
                 index++;
@@ -222,11 +222,9 @@ function App() {
             type: "entry_function_payload",
             function: `${moduleAddress}::tic_tac_toe::play_space`,
             type_arguments: [],
-            // TODO add multiplayer and lookup
             arguments: [gameAddress, space],
         };
 
-        // TODO: Add simulation to tell if move is valid prior to submission?
         try {
             // sign and submit transaction to chain
             const response = await signAndSubmitTransaction(payload);
@@ -252,7 +250,15 @@ function App() {
                     </Col>
                 </Row>
             </Layout>
-            <Spin spinning={transactionInProgress}>
+            {
+               !connected &&
+                <Alert message = {`Please connect your wallet`} type = "info"/>
+            }
+            {
+                connected && network?.name as string!== 'Testnet' &&
+                <Alert message = {`Wallet is connected to ${network?.name}.  Please connect to testnet`} type = "warning"/>
+            }
+            { connected && network?.name as string === "Testnet" && <Spin spinning={transactionInProgress}>
                 {!accountHasGame && (
                     <div>
                         <Row gutter={[0, 32]} style={{ marginTop: "2rem" }}>
@@ -322,35 +328,35 @@ function App() {
                             </Col>
                         }
                         <Col span={8} offset={8}>
-                            <Button onClick={() => playSpace(0)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(0)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[0]}
                             </Button>
-                            <Button onClick={() => playSpace(1)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(1)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[1]}
                             </Button>
-                            <Button onClick={() => playSpace(2)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(2)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[2]}
                             </Button>
                         </Col>
                         <Col span={8} offset={8}>
-                            <Button onClick={() => playSpace(3)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(3)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[3]}
                             </Button>
-                            <Button onClick={() => playSpace(4)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(4)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[4]}
                             </Button>
-                            <Button onClick={() => playSpace(5)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(5)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[5]}
                             </Button>
                         </Col>
                         <Col span={8} offset={8}>
-                            <Button onClick={() => playSpace(6)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(6)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[6]}
                             </Button>
-                            <Button onClick={() => playSpace(7)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(7)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[7]}
                             </Button>
-                            <Button onClick={() => playSpace(8)} block type="primary" style={{ width: "40px", height: "40px", backgroundColor: "#723e00" }}>
+                            <Button onClick={() => playSpace(8)} block type="primary" style={{ width: "80px", height: "80px"}}>
                                 {board[8]}
                             </Button>
                         </Col>
@@ -372,7 +378,7 @@ function App() {
                         </Input.Group>
                     </div>
                 )}
-            </Spin>
+            </Spin>}
         </>
     );
 }
