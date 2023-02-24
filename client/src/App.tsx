@@ -262,13 +262,13 @@ function App() {
                 {!accountHasGame && (
                     <div>
                         <Row gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-                            <Col span={8} offset={8}>
+                            <Col span={12} offset={8}>
                                 <Input.Group compact>
                                     <p>Game Address</p>
                                     <Input
                                         onChange={(event) => {onChangeGameAddress(event)}}
                                         style={{ width: "calc(100% - 60px)" }}
-                                        placeholder=""
+                                        placeholder="Game Address"
                                         size="large"
                                         defaultValue={gameAddress}
                                     />
@@ -283,22 +283,20 @@ function App() {
                             </Col>
                         </Row>
                         <Row gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-                            <Col span={8} offset={8}>
+                            <Col span={12} offset={8}>
                                 <Input.Group compact>
-                                    <p>Player X</p>
                                     <Input
                                         onChange={(event) => {onChangeXAddress(event)}}
                                         style={{ width: "calc(100% - 60px)" }}
-                                        placeholder=""
+                                        placeholder="Player X Address"
                                         size="large"
                                         defaultValue={XAddress}
                                     />
 
-                                    <p>Player O</p>
                                     <Input
                                         onChange={(event) => {onChangeOAddress(event)}}
                                         style={{ width: "calc(100% - 60px)" }}
-                                        placeholder=""
+                                        placeholder="Player O Address"
                                         size="large"
                                         defaultValue={OAddress}
                                     />
@@ -327,7 +325,7 @@ function App() {
                             <Alert message = {`Winner is ${winner.symbol} (${winner.address})`} type = {winner.alert_type}/>
                             </Col>
                         }
-                        <Col span={8} offset={8}>
+                        <Col span={12} offset={8}>
                             <Button onClick={() => playSpace(0)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[0]}
                             </Button>
@@ -338,7 +336,7 @@ function App() {
                                 {board[2]}
                             </Button>
                         </Col>
-                        <Col span={8} offset={8}>
+                        <Col span={12} offset={8}>
                             <Button onClick={() => playSpace(3)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[3]}
                             </Button>
@@ -349,7 +347,7 @@ function App() {
                                 {board[5]}
                             </Button>
                         </Col>
-                        <Col span={8} offset={8}>
+                        <Col span={12} offset={8}>
                             <Button onClick={() => playSpace(6)} block type="primary" style={{ width: "80px", height: "80px" }}>
                                 {board[6]}
                             </Button>
