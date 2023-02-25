@@ -26,6 +26,8 @@ module deploy_account::tic_tac_toe {
     const EGAME_ALREADY_EXISTS: u64 = 9;
     /// Invalid resetter.  Only the game admin, or one of the players can reset.
     const EINVALID_RESETTER: u64 = 10;
+    /// Player is same for X and O.  Please put different players for each.
+    const ESAME_PLAYER_FOR_BOTH: u64 = 11;
 
     /// Space is empty
     const NONE: u8 = 0;
@@ -51,6 +53,7 @@ module deploy_account::tic_tac_toe {
     /// Set up a Tic-tac-toe board which is an 3x3 square with 3 rows of each player
     public entry fun start_game(game_signer: &signer, x_player: address, o_player: address) {
         assert!(!exists<TicTacToe>(address_of(game_signer)), EGAME_ALREADY_EXISTS);
+        assert!(x_player != o_player, ESAME_PLAYER_FOR_BOTH);
         let spaces = vector::empty<u8>();
 
         // Row 1
@@ -126,8 +129,13 @@ module deploy_account::tic_tac_toe {
     public entry fun play_space(player: &signer, game_address: address, location: u64) acquires TicTacToe {
         // Retrieve game info, and check that it's actually the player's turn
         assert!(exists<TicTacToe>(game_address), EGAME_NOT_FOUND);
+
         let player_address = address_of(player);
         let game = borrow_global_mut<TicTacToe>(game_address);
+
+        // Don't let this move happen if there's a winner
+        let winner = evaluate_winner(&game.board);
+        assert!(winner == NONE, EGAME_OVER);
 
         // Ensure it's the player's turn to go
         let next_player = if (player_address == game.x_player) {
