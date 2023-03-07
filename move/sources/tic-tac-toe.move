@@ -1,10 +1,11 @@
 module deploy_account::tic_tac_toe {
 
-    use deploy_account::boardgame;
+    use std::string::String;
     use std::vector;
-    use deploy_account::boardgame::Board;
     use std::signer::address_of;
     use aptos_framework::timestamp;
+    use aptos_std::simple_map::SimpleMap;
+    use aptos_std::simple_map;
 
     /// No winner has won the game, cannot reset the game yet
     const EGAME_NOT_OVER: u64 = 1;
@@ -28,6 +29,10 @@ module deploy_account::tic_tac_toe {
     const EINVALID_RESETTER: u64 = 10;
     /// Player is same for X and O.  Please put different players for each.
     const ESAME_PLAYER_FOR_BOTH: u64 = 11;
+    /// Index is out of bounds of the board
+    const EOUT_OF_BOUNDS: u64 = 12;
+    /// Store doesn't exist, please start a game first
+    const ESTORE_NOT_FOUND: u64 = 13;
 
     /// Space is empty
     const NONE: u8 = 0;
@@ -38,10 +43,15 @@ module deploy_account::tic_tac_toe {
     /// Neither player wins
     const DRAW: u8 = 3;
 
+    /// A store for multiple tic-tac-toe boards
+    struct TicTacToeStore has key, store, drop {
+        games: SimpleMap<String, TicTacToe>,
+    }
+
     /// Holder for tic tac toe information
-    struct TicTacToe has key, drop {
+    struct TicTacToe has store, drop {
         /// The board holding all the marks
-        board: Board<u8>,
+        board: vector<u8>,
         /// The next to play
         current_player: u8,
         /// Address of the X player
@@ -51,8 +61,12 @@ module deploy_account::tic_tac_toe {
     }
 
     /// Set up a Tic-tac-toe board which is an 3x3 square with 3 rows of each player
-    public entry fun start_game(game_signer: &signer, x_player: address, o_player: address) {
-        assert!(!exists<TicTacToe>(address_of(game_signer)), EGAME_ALREADY_EXISTS);
+    public entry fun start_game(
+        game_signer: &signer,
+        game_name: String,
+        x_player: address,
+        o_player: address
+    ) acquires TicTacToeStore {
         assert!(x_player != o_player, ESAME_PLAYER_FOR_BOTH);
         let spaces = vector::empty<u8>();
 
@@ -79,98 +93,123 @@ module deploy_account::tic_tac_toe {
             O
         };
 
-        let board = boardgame::new(spaces);
-        move_to(game_signer, TicTacToe {
-            board,
+        let game_address = address_of(game_signer);
+
+        // Initialize store if it doesn't exist
+        if (!exists<TicTacToeStore>(game_address)) {
+            move_to(game_signer, TicTacToeStore {
+                games: simple_map::create<String, TicTacToe>()
+            });
+        } else {
+            // Check if game already exists
+            let store = borrow_global<TicTacToeStore>(game_address);
+            assert!(!simple_map::contains_key<String, TicTacToe>(&store.games, &game_name), EGAME_ALREADY_EXISTS);
+        };
+
+        let store = borrow_global_mut<TicTacToeStore>(game_address);
+        let game = TicTacToe {
+            board: spaces,
             current_player,
             x_player,
             o_player
-        })
+        };
+
+        simple_map::add(&mut store.games, game_name, game);
     }
 
     /// Removes the game from the account
-    public entry fun delete_game(game_signer: &signer) acquires TicTacToe {
+    public entry fun delete_game(game_signer: &signer, game_name: String) acquires TicTacToeStore {
         let game_address = address_of(game_signer);
-        assert!(exists<TicTacToe>(game_address), EGAME_NOT_FOUND);
-        move_from<TicTacToe>(game_address);
+        let store = get_store_mut(game_address);
+        assert!(simple_map::contains_key(&store.games, &game_name), EGAME_NOT_FOUND);
+        simple_map::remove(&mut store.games, &game_name);
+    }
+
+    /// Removes the tic-tac-toe store from the account and all associated games
+    public entry fun delete_store(game_signer: &signer) acquires TicTacToeStore {
+        let game_address = address_of(game_signer);
+        assert!(exists<TicTacToeStore>(game_address), ESTORE_NOT_FOUND);
+        move_from<TicTacToeStore>(game_address);
     }
 
     /// Resets the game with the same players, loser goes first
-    public entry fun reset_game(signer: &signer, game_address: address) acquires TicTacToe {
-        assert!(exists<TicTacToe>(game_address), EGAME_NOT_FOUND);
-
-        let game = borrow_global_mut<TicTacToe>(game_address);
+    public entry fun reset_game(signer: &signer, game_address: address, game_name: String) acquires TicTacToeStore {
+        let game = get_game_mut(game_address, game_name);
 
         // If the game address, or one of the players want to reset they can
         let signer_address = address_of(signer);
-        assert!(signer_address == game_address || signer_address == game.x_player || signer_address == game.o_player, EINVALID_RESETTER);
+        assert!(
+            signer_address == game_address || signer_address == game.x_player || signer_address == game.o_player,
+            EINVALID_RESETTER
+        );
 
         // Can't reset game until game is over
-        let winner = evaluate_winner(&game.board);
+        let winner = evaluate_winner(game);
         assert!(winner != NONE, EGAME_NOT_OVER);
 
         // Reset all spaces to NONE
         let i = 0;
-        while (i < 8) {
-            boardgame::set_space(&mut game.board, i, NONE);
+        while (i < 9) {
+            set_space(game, i, NONE);
             i = i + 1;
         };
 
         // Next player is the loser, unless it's a draw, then whoever would be next
         if (winner == X) {
             game.current_player = O;
-        } else if (winner == O){
+        } else if (winner == O) {
             game.current_player = X;
         };
     }
 
     /// Plays a space in tic-tac-toe, setting the winner at the end
     ///
-    public entry fun play_space(player: &signer, game_address: address, location: u64) acquires TicTacToe {
+    public entry fun play_space(
+        player: &signer,
+        game_address: address,
+        game_name: String,
+        location: u64
+    ) acquires TicTacToeStore {
         // Retrieve game info, and check that it's actually the player's turn
-        assert!(exists<TicTacToe>(game_address), EGAME_NOT_FOUND);
-
+        let game = get_game_mut(game_address, game_name);
         let player_address = address_of(player);
-        let game = borrow_global_mut<TicTacToe>(game_address);
 
         // Don't let this move happen if there's a winner
-        let winner = evaluate_winner(&game.board);
+        let winner = evaluate_winner(game);
         assert!(winner == NONE, EGAME_OVER);
+        let current_player = game.current_player;
 
         // Ensure it's the player's turn to go
         let next_player = if (player_address == game.x_player) {
-            assert!(game.current_player == X, ENOT_X_PLAYER_TURN);
+            assert!(current_player == X, ENOT_X_PLAYER_TURN);
             O
         } else if (player_address == game.o_player) {
-            assert!(game.current_player == O, ENOT_O_PLAYER_TURN);
+            assert!(current_player == O, ENOT_O_PLAYER_TURN);
             X
         } else {
             abort EINVALID_PLAYER
         };
 
         // Check someone hasn't already played there
-        let space = boardgame::get_space(&game.board, location);
+        let space = get_space(game, location);
         assert!(space == NONE, ESPACE_ALREADY_PLAYED);
-
         // Place the new space
-        boardgame::set_space(&mut game.board, location, game.current_player);
+        set_space(game, location, current_player);
         game.current_player = next_player;
     }
 
     #[view]
     /// Retrieves the whole board for display purposes
-    public fun get_board(game_address: address): vector<u8> acquires TicTacToe {
-        assert!(exists<TicTacToe>(game_address), EGAME_NOT_FOUND);
-        let game = borrow_global<TicTacToe>(game_address);
-        boardgame::get_board(&game.board)
+    public fun get_board(game_address: address, game_name: String): vector<u8> acquires TicTacToeStore {
+        let game = get_game(game_address, game_name);
+        game.board
     }
 
     #[view]
     /// Retrieves the current player.  Returns @0x0 if the game is over
-    public fun current_player(game_address: address): (u8, address) acquires TicTacToe {
-        assert!(exists<TicTacToe>(game_address), EGAME_NOT_FOUND);
-        let game = borrow_global<TicTacToe>(game_address);
-        let winner = evaluate_winner(&game.board);
+    public fun current_player(game_address: address, game_name: String): (u8, address) acquires TicTacToeStore {
+        let game = get_game(game_address, game_name);
+        let winner = evaluate_winner(game);
         if (winner != NONE) {
             (NONE, @0)
         } else if (game.current_player == X) {
@@ -182,70 +221,106 @@ module deploy_account::tic_tac_toe {
 
     #[view]
     /// Views the winner (if any)
-    public fun winner(game_address: address): (u8, address) acquires TicTacToe {
-        assert!(exists<TicTacToe>(game_address), EGAME_NOT_FOUND);
-        let game = borrow_global<TicTacToe>(game_address);
-        let winner = evaluate_winner(&game.board);
+    public fun winner(game_address: address, game_name: String): (u8, address) acquires TicTacToeStore {
+        let game = get_game(game_address, game_name);
+        let winner = evaluate_winner(game);
 
         if (winner == NONE) {
             (NONE, @0)
         } else if (winner == X) {
             (X, game.x_player)
-        } else if (winner == O){
+        } else if (winner == O) {
             (O, game.o_player)
         } else {
             (DRAW, @0)
         }
     }
 
+    inline fun get_store(game_address: address): &TicTacToeStore acquires TicTacToeStore {
+        assert!(exists<TicTacToeStore>(game_address), ESTORE_NOT_FOUND);
+        borrow_global<TicTacToeStore>(game_address)
+    }
+
+    inline fun get_store_mut(game_address: address): &mut TicTacToeStore acquires TicTacToeStore {
+        assert!(exists<TicTacToeStore>(game_address), ESTORE_NOT_FOUND);
+        borrow_global_mut<TicTacToeStore>(game_address)
+    }
+
+    /// Gets the game in a read only capacity, handling errors if not found
+    inline fun get_game(game_address: address, game_name: String): &TicTacToe acquires TicTacToeStore {
+        let store = get_store(game_address);
+        assert!(simple_map::contains_key(&store.games, &game_name), EGAME_NOT_FOUND);
+        simple_map::borrow(&store.games, &game_name)
+    }
+
+    /// Gets the game in a mutating capacity, handling errors if not found
+    inline fun get_game_mut(game_address: address, game_name: String): &mut TicTacToe acquires TicTacToeStore {
+        let store = get_store_mut(game_address);
+        assert!(simple_map::contains_key(&store.games, &game_name), EGAME_NOT_FOUND);
+        simple_map::borrow_mut(&mut store.games, &game_name)
+    }
+
     /// Determine the winner (if any)
-    fun evaluate_winner(board: &Board<u8>): u8 {
+    inline fun evaluate_winner(game: &TicTacToe): u8 {
         // Collect all spaces
-        let spaces = boardgame::get_board(board);
-        let upper_left = vector::borrow(&spaces, 0);
-        let upper_mid = vector::borrow(&spaces, 1);
-        let upper_right = vector::borrow(&spaces, 2);
-        let mid_left = vector::borrow(&spaces, 3);
-        let mid_mid = vector::borrow(&spaces, 4);
-        let mid_right = vector::borrow(&spaces, 5);
-        let lower_left = vector::borrow(&spaces, 6);
-        let lower_mid = vector::borrow(&spaces, 7);
-        let lower_right = vector::borrow(&spaces, 8);
+        let upper_left = vector::borrow(&game.board, 0);
+        let upper_mid = vector::borrow(&game.board, 1);
+        let upper_right = vector::borrow(&game.board, 2);
+        let mid_left = vector::borrow(&game.board, 3);
+        let mid_mid = vector::borrow(&game.board, 4);
+        let mid_right = vector::borrow(&game.board, 5);
+        let lower_left = vector::borrow(&game.board, 6);
+        let lower_mid = vector::borrow(&game.board, 7);
+        let lower_right = vector::borrow(&game.board, 8);
 
         // Handle matches
         if (*upper_left != NONE && *upper_left == *upper_mid && *upper_mid == *upper_right) {
             // Upper row
-            return *upper_left
+            *upper_left
         } else if (*mid_left != NONE && *mid_left == *mid_mid && *mid_mid == *mid_right) {
             // Mid row
-            return *mid_left
+            *mid_left
         } else if (*lower_left != NONE && *lower_left == *lower_mid && *lower_mid == *lower_right) {
             // Lower row
-            return *lower_left
+            *lower_left
         } else if (*upper_left != NONE && *upper_left == *mid_left && *mid_left == *lower_left) {
             // Left col
-            return *upper_left
+            *upper_left
         } else if (*upper_mid != NONE && *upper_mid == *mid_mid && *mid_mid == *lower_mid) {
             // Mid col
-            return *upper_mid
+            *upper_mid
         } else if (*upper_right != NONE && *upper_right == *mid_right && *mid_right == *lower_right) {
             // Right col
-            return *upper_right
+            *upper_right
         } else if (*upper_left != NONE && *upper_left == *mid_mid && *mid_mid == *lower_right) {
             // Upper left to lower right
-            return *upper_left
+            *upper_left
         } else if (*lower_left != NONE && *lower_left == *mid_mid && *mid_mid == *upper_right) {
             // Lower left to upper right
-            return *upper_mid
-        };
-
-        // If all spaces are filled, game is over (TODO: We can be smarter than this on the draw condition and end early probably)
-        if (*upper_left == NONE || *upper_mid == NONE || *upper_right == NONE ||
+            *upper_mid
+        } else if (*upper_left == NONE || *upper_mid == NONE || *upper_right == NONE ||
             *mid_left == NONE || *mid_mid == NONE || *mid_right == NONE ||
             *lower_left == NONE || *lower_mid == NONE || *lower_right == NONE) {
+            // If all spaces are filled, game is over (TODO: We can be smarter than this on the draw condition and end early probably)
             NONE
         } else {
             DRAW
         }
+    }
+
+    /// Retrieves a space given by an index.
+    ///
+    /// This allows for varying adjacency schemes of squares on the board.
+    inline fun get_space(game: &TicTacToe, index: u64): u8 {
+        assert!(index < vector::length(&game.board), EOUT_OF_BOUNDS);
+        *vector::borrow(&game.board, index)
+    }
+
+    /// Sets a specific space given by an index to the new value.
+    inline fun set_space(game: &mut TicTacToe, index: u64, new_value: u8) {
+        // Must be within bounds of the fixed size board
+        assert!(index < vector::length(&game.board), EOUT_OF_BOUNDS);
+        let square = vector::borrow_mut(&mut game.board, index);
+        *square = new_value;
     }
 }

@@ -1,6 +1,6 @@
 [package]
-name = 'ExampleGames'
-version = '0.1.0'
+name = 'ExampleTicTacToe'
+version = '0.2.0'
 [dependencies.AptosFramework]
 git = 'https://github.com/aptos-labs/aptos-core.git'
 rev = 'main'
