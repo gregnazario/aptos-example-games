@@ -436,11 +436,29 @@ function App(this: any) {
                                 </Input.Group>
                             </Col>
                         </Row>
+                        <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                            <Col span={8} offset={8}>
+                                <p><b>How to play:</b>
+                                    <li>Connect your wallet of choice with the button in the upper left</li>
+                                    <li>To connect to an existing game, enter a game ID into the game ID field and click
+                                        "Join Game". If the account was "0x12345" and the game name was "default", the
+                                        game id would be "0x12345:default"
+                                    </li>
+                                    <li>To create a new game, enter the names of the two players, as well as a name for
+                                        the game to be used in the game ID, and click start new game.
+                                    </li>
+                                    <li>The game URL will then be switched to the game, and the page can simply be
+                                        refreshed for future updates
+                                    </li>
+                                    <li>Future will add listing of games, maybe matchmaking as well</li>
+                                </p>
+                            </Col>
+                        </Row>
                     </div>
                 )}
                 {accountHasGame && (<div>
                         <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
-                            <Col span={8} offset={8}>
+                            <Col span={4} offset={2}>
                                 <Button
                                     onClick={() => mainMenu()}
                                     type="primary"
@@ -448,6 +466,9 @@ function App(this: any) {
                                 >
                                     Main Menu
                                 </Button>
+                            </Col>
+                            <Col span={4} offset={2}>
+                                Game Name: {splitGameId(gameId)[1]}
                             </Col>
                         </Row>
                         <Input.Group>
@@ -524,6 +545,25 @@ function App(this: any) {
                                 }
                             </Row>
                         </Input.Group>
+                        <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                            <Col span={8} offset={8}>
+                                <p><b>How to play:</b>
+                                    <li>Click the space that you'd like to play</li>
+                                    <li>Accept the transaction, or cancel and choose a new space</li>
+                                    <li>Wait for the other person to finish their turn and refresh (Sometime
+                                        auto-refresh will be added)
+                                    </li>
+                                    <li>The goal of the game is to get 3 in a row without getting blocked by the other
+                                        player.
+                                    </li>
+                                    <li>All rules of tic-tac-toe are enforced on-chain and cannot be cheated</li>
+                                    <li>When the game ends, either player can reset the game with "Play again"</li>
+                                    <li>If you're the creator of the game, you can delete the game entirely with "Delete
+                                        game"
+                                    </li>
+                                </p>
+                            </Col>
+                        </Row>
                     </div>
                 )}
             </Spin>}
