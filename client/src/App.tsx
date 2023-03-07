@@ -54,8 +54,8 @@ function App(this: any) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [account])
 
-    // Listener for changing the Game Address input box
-    const onChangeGameAddress = async (event: ChangeEvent<HTMLInputElement>) => {
+    // Listener for changing the Game Id input box
+    const onChangeGameId = async (event: ChangeEvent<HTMLInputElement>) => {
         // TODO: Resolve for address also the ANS names
         const value = event.target.value;
         setEnteredGameId(value);
@@ -373,13 +373,13 @@ function App(this: any) {
                             }
                             <Col span={12} offset={8}>
                                 <Input.Group compact>
-                                    <p>Game Address</p>
+                                    <p>Game Id (Address:Name)</p>
                                     <Input
                                         onChange={(event) => {
-                                            onChangeGameAddress(event)
+                                            onChangeGameId(event)
                                         }}
                                         style={{width: "calc(100% - 60px)"}}
-                                        placeholder="Game Address"
+                                        placeholder="Game Id (Address:Name)"
                                         size="large"
                                         defaultValue={gameId}
                                     />
