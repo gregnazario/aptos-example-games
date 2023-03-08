@@ -7,7 +7,7 @@ import {ChangeEvent, useEffect, useState} from "react";
 import {createBrowserHistory} from "history";
 import {matchPath} from "react-router";
 
-const {Title, Paragraph} = Typography;
+const {Paragraph} = Typography;
 
 // TODO: Load URL from wallet
 export const NODE_URL = "https://fullnode.mainnet.aptoslabs.com";
@@ -386,7 +386,7 @@ function App(this: any) {
         if (!account) return [];
 
         // If it's not the correct address, not lets accidentally delete the wrong game
-        if (gameIdAddress != account?.address) return [];
+        if (gameIdAddress !== account?.address) return [];
 
         setTransactionInProgress(true);
         const payload = {
