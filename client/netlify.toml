@@ -1,0 +1,12 @@
+# Let's not use the "netlify" domain
+[[redirects]]
+  from = "https://aptos-tic-tac-toe.netlify.app"
+  to = "https://gnazar.io"
+  status = 301
+  force = true
+
+# Ensure that SPA works correctly
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
