@@ -1,37 +1,46 @@
-import {Layout, Row, Col, Button, Spin, Input, Alert} from "antd";
+import {Alert, Button, Col, Descriptions, Input, Layout, Row, Spin, Typography} from "antd";
 import {WalletSelector} from "@aptos-labs/wallet-adapter-ant-design";
 import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
 import {AptosClient} from "aptos";
 import {useWallet} from "@aptos-labs/wallet-adapter-react";
-import {ChangeEvent, useState, useEffect} from "react";
+import {ChangeEvent, useEffect, useState} from "react";
 import {createBrowserHistory} from "history";
 import {matchPath} from "react-router";
 
+const {Title, Paragraph} = Typography;
+
 // TODO: Load URL from wallet
-export const NODE_URL = "https://fullnode.testnet.aptoslabs.com";
+export const NODE_URL = "https://fullnode.mainnet.aptoslabs.com";
 export const client = new AptosClient(NODE_URL);
 
 
 // TODO: make this more accessible / be deployed by others?
-export const moduleAddress = "0x3e650cb888bc74421a4d8a0c35ddaf37608465d7fe4bf0aae092188568bab6b9";
+export const moduleAddress = "0x3b36cac0ec1054b6a99facdef2a0015a2858ff75d10251590e606365394ac5bd";
 
 function App(this: any) {
     const NONE = 0;
     const X = 1;
-    const O = 2;
+    const O = 2
     const DRAW = 3;
 
+    // TODO Consolidate a lot of these
     const [accountHasGame, setAccountHasGame] = useState<boolean>(false);
     const [gameOver, setGameOver] = useState<boolean>(false);
     const [transactionInProgress, setTransactionInProgress] = useState<boolean>(false);
-    const [enteredGameId, setEnteredGameId] = useState<string>("");
-    const [gameId, setGameId] = useState<string>("");
+    const [gameCreator, setGameCreator] = useState<string>("");
+    const [gameIdAddress, setGameIdAddress] = useState<string>("");
+    const [gameIdName, setGameIdName] = useState<string>("");
     const [gameNotFound, setGameNotFound] = useState<boolean>(false);
     const [gameName, setGameName] = useState<string>("default");
     const [XAddress, setXAddress] = useState<string>("");
     const [OAddress, setOAddress] = useState<string>("");
 
-    const [currentPlayer, setCurrentPlayer] = useState<{ symbol: string, address: string }>({symbol: "", address: ""});
+    const [currentPlayer, setCurrentPlayer] = useState<{ symbol: string, address: string, name: string }>({
+        symbol: "",
+        address: "",
+        name: ""
+    });
+    const [players, setPlayers] = useState<{ playerX: string, playerO: string }>({playerX: "", playerO: ""});
     const [winner, setWinner] = useState<{ symbol: string, address: string, alert_type: "success" | "warning" | "error" }>({
         symbol: "",
         address: "",
@@ -43,22 +52,48 @@ function App(this: any) {
 
     useEffect(() => {
         // On load, pull the game from the path, otherwise go to main menu
-        const match = matchPath("/game/:game_id", window.location.pathname);
+        const match = matchPath("/game/:game_address/:game_name", window.location.pathname);
 
-        if (match != null && match.params.game_id != null) {
-            const gameId = match.params.game_id;
-            setGameId(gameId);
-            setEnteredGameId(gameId);
-            fetchGame(gameId)
+        if (match != null && match.params.game_address != null && match.params.game_name != null) {
+            let game_address = match.params.game_address;
+            let game_name = match.params.game_name;
+            setup_game_on_load(game_address, game_name).catch(console.error);
+        } else if (account?.address != null) {
+            setGameCreator(account?.address)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [account])
+    }, [account, network?.name])
 
-    // Listener for changing the Game Id input box
-    const onChangeGameId = async (event: ChangeEvent<HTMLInputElement>) => {
-        // TODO: Resolve for address also the ANS names
-        const value = event.target.value;
-        setEnteredGameId(value);
+    // Retrieves the address and name from the URL
+    const getAddressAndNameFromURL = (): { address: string, name: string } => {
+        const match = matchPath("/game/:game_address/:game_name", window.location.pathname);
+
+        if (match != null && match.params.game_address != null && match.params.game_name != null) {
+            return {address: match.params.game_address, name: match.params.game_name}
+        } else {
+            return {address: "", name: ""}
+        }
+    }
+
+    // Sets up the game on load.  has to be done this way since no await in use effect
+    const setup_game_on_load = async (game_address: string, game_name: string) => {
+        let creator_name = await resolveToName(game_address);
+        let creator_address = await resolveToAddress(game_address);
+        setGameCreator(creator_name);
+        setGameIdAddress(creator_address);
+        joinGameInner(game_address, game_name)
+    }
+
+    // Listener for changing the Game name input box
+    const onChangeGameIdName = async (event: ChangeEvent<HTMLInputElement>) => {
+        const name = event.target.value;
+        setGameIdName(name);
+    }
+
+    // Listener for changing the Game address input box
+    const onChangeGameIdAddress = async (event: ChangeEvent<HTMLInputElement>) => {
+        const address = event.target.value;
+        setGameIdAddress(address);
     }
 
     // Listener for changing the X Address input box
@@ -69,21 +104,52 @@ function App(this: any) {
 
     // Listener for changing the X Address input box
     const onChangeXAddress = async (event: ChangeEvent<HTMLInputElement>) => {
-        // TODO: Resolve for address also the ANS names
-        const value = event.target.value;
-        setXAddress(value);
+        const address = event.target.value;
+        setXAddress(address);
     }
 
     // Listener for changing the O Address input box
     const onChangeOAddress = async (event: ChangeEvent<HTMLInputElement>) => {
-        // TODO: Resolve for address also the ANS names
-        const value = event.target.value;
-        setOAddress(value);
+        const address = event.target.value;
+        setOAddress(address);
+    }
+
+    // Resolves a name or address to a name
+    const resolveToName = async (maybe_address: string): Promise<string> => {
+        // TODO: Provide useful messages if names don't resolve
+        try {
+            const response = await fetch(`https://www.aptosnames.com/api/mainnet/v1/primary-name/${maybe_address}`);
+            const {name} = await response.json();
+
+            // If I can resolve the name, let's provide that
+            if (name != null) {
+                return `${name}.apt`
+            }
+        } catch {
+        }
+
+        // In all other cases, show the original string
+        return maybe_address
+    }
+
+    // Resolves a name or address to an address
+    const resolveToAddress = async (maybe_name: string): Promise<string> => {
+        // TODO: Provide useful messages if names don't resolve
+        try {
+            const response = await fetch(`https://www.aptosnames.com/api/mainnet/v1/address/${maybe_name}`);
+            const {address} = await response.json();
+            // If name resolves, return the address
+            if (address != null) {
+                return address
+            }
+        } catch {
+        }
+        // If it can't resolve, act like it's an address
+        return maybe_name
     }
 
     // Fetches the winner given a game address
-    const fetchWinner = async (gameId: string) => {
-        let [gameAddress, gameName] = splitGameId(gameId);
+    const fetchWinner = async (gameAddress: string, gameName: string) => {
         try {
             // Run the view function to fetch the winner
             const winner_info = await client.view({
@@ -143,26 +209,29 @@ function App(this: any) {
 
     // Go to the game page
     const joinGame = async () => {
-        // First save the game address
-        // TODO: probably just use URL and not save twice
-        setGameId(enteredGameId);
-        let browserHistory = createBrowserHistory();
-        browserHistory.push(`/game/${enteredGameId}`);
-        // Now fetch game
-        await fetchGame(enteredGameId);
-        await fetchWinner(enteredGameId);
-    };
-
-    function splitGameId(gameId: String): [string, string] {
-        let parts = gameId.split(":");
-        return [parts[0], parts[1]]
+        await joinGameInner(gameIdAddress, gameIdName)
     }
 
+    const joinGameInner = async (gameAddress: string, gameName: string) => {
+        // Resolve names first
+        let creator_name = await resolveToName(gameAddress);
+        let creator_address = await resolveToAddress(gameAddress);
+
+        setGameCreator(creator_name);
+        setGameIdAddress(creator_address);
+        // First save the game address
+        let browserHistory = createBrowserHistory();
+        browserHistory.push(`/game/${creator_name}/${gameName}`);
+
+        // Now fetch game
+        await fetchGame(creator_address, gameName);
+        await fetchWinner(creator_address, gameName);
+    };
+
     // Retrieve game board from on chain
-    const fetchGame = async (gameId: string) => {
+    const fetchGame = async (gameAddress: string, gameName: string) => {
         // Set transaction in progress for "loading" spinner
         setTransactionInProgress(true);
-        let [gameAddress, gameName] = splitGameId(gameId);
 
         try {
             // Retrieve the whole board array via view function
@@ -179,19 +248,34 @@ function App(this: any) {
                 type_arguments: []
             });
 
+            // Retrieve current players by view function
+            const players = await client.view({
+                arguments: [gameAddress, gameName],
+                function: `${moduleAddress}::tic_tac_toe::players`,
+                type_arguments: []
+            });
+
+            // Resolve names for players
+            const playerX = await resolveToName(players[0].toString());
+            const playerO = await resolveToName(players[1].toString());
+
             // Convert player info to readable outputs
             const player_num = current_player[0] as number;
             let player_address = "";
             let player_symbol = "";
+            let player_name = "";
             if (player_num === X) {
                 player_symbol = "X"
                 player_address = current_player[1].toString();
+                player_name = playerX;
             } else if (player_num === O) {
                 player_symbol = "O"
                 player_address = current_player[1].toString();
+                player_name = playerO;
             } else {
                 player_symbol = ""
                 player_address = "";
+                player_name = "";
             }
 
             // Run through each square in the board, and populate the board
@@ -212,12 +296,15 @@ function App(this: any) {
             }
 
             // Setup all the board display information
-            setCurrentPlayer({symbol: player_symbol, address: player_address});
+
+            setPlayers({playerX: playerX, playerO: playerO});
+            setCurrentPlayer({symbol: player_symbol, address: player_address, name: player_name});
             setBoard(layout);
             setAccountHasGame(true);
             setGameNotFound(false);
-            await fetchWinner(gameId);
+            await fetchWinner(gameAddress, gameName);
         } catch (e: any) {
+            console.error(e)
             // If it errors out, we say there's no game found
             setAccountHasGame(false);
             setGameNotFound(true);
@@ -232,12 +319,17 @@ function App(this: any) {
         // Ensure you're logged in
         if (!account) return [];
         setTransactionInProgress(true);
+
+        // Resolve addresses
+        let x_address = await resolveToAddress(XAddress);
+        let o_address = await resolveToAddress(OAddress);
+
         // Start the new game!
         const payload = {
             type: "entry_function_payload",
             function: `${moduleAddress}::tic_tac_toe::start_game`,
             type_arguments: [],
-            arguments: [gameName, XAddress, OAddress],
+            arguments: [gameName, x_address, o_address],
         };
 
         try {
@@ -245,14 +337,13 @@ function App(this: any) {
             const response = await signAndSubmitTransaction(payload);
             await client.waitForTransaction(response.hash);
 
-            const gameId = `${account.address}:${gameName}`
             // Initialize the local state
+            setGameIdAddress(account.address);
+            setGameIdName(gameName);
             let browserHistory = createBrowserHistory();
-            browserHistory.push(`/game/${gameId}`);
+            browserHistory.push(`/game/${account.address}/${gameName}`);
             setAccountHasGame(true);
-            setEnteredGameId(gameId);
-            setGameId(gameId);
-            await fetchGame(gameId);
+            await fetchGame(account.address, gameName);
         } catch (error: any) {
             // TODO: Display banner of error of creation
             setAccountHasGame(false);
@@ -266,12 +357,11 @@ function App(this: any) {
         // Ensure you're logged in
         if (!account) return [];
         setTransactionInProgress(true);
-        let [gameAddress, gameName] = splitGameId(gameId);
         const payload = {
             type: "entry_function_payload",
             function: `${moduleAddress}::tic_tac_toe::reset_game`,
             type_arguments: [],
-            arguments: [gameAddress, gameName],
+            arguments: [gameIdAddress, gameIdName],
         };
 
         try {
@@ -282,7 +372,7 @@ function App(this: any) {
             setAccountHasGame(true);
             setWinner({symbol: "", address: "", alert_type: "warning"});
             setGameOver(false);
-            await fetchGame(gameId)
+            await fetchGame(gameIdAddress, gameIdName)
         } catch (error: any) {
             // TODO: Display banner of error of reset
         } finally {
@@ -294,22 +384,26 @@ function App(this: any) {
     const deleteGame = async () => {
         // Ensure you're logged in
         if (!account) return [];
+
+        // If it's not the correct address, not lets accidentally delete the wrong game
+        if (gameIdAddress != account?.address) return [];
+
         setTransactionInProgress(true);
-        let [gameName] = splitGameId(gameId);
         const payload = {
             type: "entry_function_payload",
             function: `${moduleAddress}::tic_tac_toe::delete_game`,
             type_arguments: [],
-            arguments: [gameName],
+            arguments: [gameIdName],
         };
 
         try {
             const response = await signAndSubmitTransaction(payload);
             await client.waitForTransaction(response.hash);
+            // Refresh state
             setAccountHasGame(false);
             setWinner({symbol: "", address: "", alert_type: "warning"});
             setGameOver(false);
-            await fetchGame(gameId)
+            await fetchGame(gameIdAddress, gameIdName)
         } catch (error: any) {
             // TODO: Display banner of error of delete
             setAccountHasGame(false);
@@ -322,12 +416,12 @@ function App(this: any) {
     const playSpace = async (space: number) => {
         // Ensure you're logged in
         if (!account) return [];
-        let [gameAddress, gameName] = splitGameId(gameId);
+        setTransactionInProgress(true);
         const payload = {
             type: "entry_function_payload",
             function: `${moduleAddress}::tic_tac_toe::play_space`,
             type_arguments: [],
-            arguments: [gameAddress, gameName, space],
+            arguments: [gameIdAddress, gameIdName, space],
         };
 
         try {
@@ -336,10 +430,12 @@ function App(this: any) {
             setAccountHasGame(true);
         } catch (error: any) {
             setAccountHasGame(false);
+        } finally {
+            setTransactionInProgress(false);
         }
 
         // Fetch the new board
-        await fetchGame(gameId);
+        await fetchGame(gameIdAddress, gameIdName);
     }
 
     return (
@@ -347,7 +443,7 @@ function App(this: any) {
             <Layout>
                 <Row align="middle">
                     <Col span={10} offset={2}>
-                        <h1>Tic-Tac-Toe</h1>
+                        <h1>Tic-Tac-Toe ({network?.name})</h1>
                     </Col>
                     <Col span={12} style={{textAlign: "right", paddingRight: "200px"}}>
                         <WalletSelector/>
@@ -359,29 +455,41 @@ function App(this: any) {
                 <Alert message={`Please connect your wallet`} type="info"/>
             }
             {
-                connected && network?.name as string !== 'Testnet' &&
-                <Alert message={`Wallet is connected to ${network?.name}.  Please connect to testnet`} type="warning"/>
+                connected && network?.name as string !== 'Mainnet' &&
+                <Alert message={`Wallet is connected to ${network?.name}.  Please connect to mainnet`} type="warning"/>
             }
-            {connected && network?.name as string === "Testnet" && <Spin spinning={transactionInProgress}>
+            {connected && network?.name as string === "Mainnet" && <Spin spinning={transactionInProgress}>
                 {!accountHasGame && (
                     <div>
                         <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
                             {gameNotFound &&
                                 <Col span={8} offset={8}>
-                                    <Alert message={`Game is not found at (${gameId})`} type="error"/>
+                                    <Alert
+                                        message={`Game ${getAddressAndNameFromURL().name} is not found at ${getAddressAndNameFromURL().address}`}
+                                        type="error"/>
                                 </Col>
                             }
                             <Col span={12} offset={8}>
                                 <Input.Group compact>
-                                    <p>Game Id (Address:Name)</p>
+                                    <Paragraph>Game Creator</Paragraph>
                                     <Input
                                         onChange={(event) => {
-                                            onChangeGameId(event)
+                                            onChangeGameIdAddress(event)
                                         }}
                                         style={{width: "calc(100% - 60px)"}}
-                                        placeholder="Game Id (Address:Name)"
+                                        placeholder="Game Creator"
                                         size="large"
-                                        defaultValue={gameId}
+                                        defaultValue={gameIdAddress}
+                                    />
+                                    <Paragraph>Game Name</Paragraph>
+                                    <Input
+                                        onChange={(event) => {
+                                            onChangeGameIdName(event)
+                                        }}
+                                        style={{width: "calc(100% - 60px)"}}
+                                        placeholder="Game Name"
+                                        size="large"
+                                        defaultValue={gameIdName}
                                     />
                                     <Button
                                         onClick={() => joinGame()}
@@ -440,12 +548,13 @@ function App(this: any) {
                             <Col span={8} offset={8}>
                                 <p><b>How to play:</b>
                                     <li>Connect your wallet of choice with the button in the upper left</li>
-                                    <li>To connect to an existing game, enter a game ID into the game ID field and click
+                                    <li>To connect to an existing game, enter a game creator (APT Name or Address) into
+                                        the game creator field, and the game name into the game name field. Then, click
                                         "Join Game". If the account was "0x12345" and the game name was "default", the
-                                        game id would be "0x12345:default"
+                                        game id would be "0x12345" and "default"
                                     </li>
                                     <li>To create a new game, enter the names of the two players, as well as a name for
-                                        the game to be used in the game ID, and click start new game.
+                                        the game, and click start new game.
                                     </li>
                                     <li>The game URL will then be switched to the game, and the page can simply be
                                         refreshed for future updates
@@ -458,7 +567,7 @@ function App(this: any) {
                 )}
                 {accountHasGame && (<div>
                         <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
-                            <Col span={4} offset={2}>
+                            <Col span={8} offset={8}>
                                 <Button
                                     onClick={() => mainMenu()}
                                     type="primary"
@@ -467,8 +576,13 @@ function App(this: any) {
                                     Main Menu
                                 </Button>
                             </Col>
-                            <Col span={4} offset={2}>
-                                Game Name: {splitGameId(gameId)[1]}
+                        </Row>
+                        <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                            <Col span={8} offset={8}>
+                                <Descriptions title={`${gameCreator} : ${gameIdName}`} bordered size="middle">
+                                    <Descriptions.Item label="Player X" span={8}>{players.playerX}</Descriptions.Item>
+                                    <Descriptions.Item label="Player O" span={8}>{players.playerO}</Descriptions.Item>
+                                </Descriptions>
                             </Col>
                         </Row>
                         <Input.Group>
@@ -476,7 +590,7 @@ function App(this: any) {
                                 {!gameOver &&
                                     <Col span={8} offset={8}>
                                         <Alert
-                                            message={`Current player is ${currentPlayer.symbol} (${currentPlayer.address})`}/>
+                                            message={`Current player is ${currentPlayer.symbol} (${currentPlayer.name})`}/>
                                     </Col>
                                 }
                                 {gameOver &&
@@ -535,7 +649,7 @@ function App(this: any) {
                                         </Button>
                                     </Col>
                                 }
-                                {gameOver && gameId === account?.address &&
+                                {gameOver && gameIdAddress === account?.address &&
                                     <Col span={8} offset={8}>
                                         <Button onClick={deleteGame} block type="primary"
                                                 style={{height: "40px", backgroundColor: "#3f67ff"}}>
