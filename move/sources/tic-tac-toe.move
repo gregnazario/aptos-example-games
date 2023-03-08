@@ -6,6 +6,7 @@ module deploy_account::tic_tac_toe {
     use aptos_framework::timestamp;
     use aptos_std::simple_map::SimpleMap;
     use aptos_std::simple_map;
+    use aptos_framework::system_addresses::is_framework_reserved_address;
 
     /// No winner has won the game, cannot reset the game yet
     const EGAME_NOT_OVER: u64 = 1;
@@ -33,6 +34,8 @@ module deploy_account::tic_tac_toe {
     const EOUT_OF_BOUNDS: u64 = 12;
     /// Store doesn't exist, please start a game first
     const ESTORE_NOT_FOUND: u64 = 13;
+    /// Cannot use framework address as a player
+    const EINVALID_ADDRESS: u64 = 14;
 
     /// Space is empty
     const NONE: u8 = 0;
@@ -68,6 +71,8 @@ module deploy_account::tic_tac_toe {
         o_player: address
     ) acquires TicTacToeStore {
         assert!(x_player != o_player, ESAME_PLAYER_FOR_BOTH);
+        assert!(!is_framework_reserved_address(x_player), EINVALID_ADDRESS);
+        assert!(!is_framework_reserved_address(o_player), EINVALID_ADDRESS);
         let spaces = vector::empty<u8>();
 
         // Row 1
@@ -217,6 +222,13 @@ module deploy_account::tic_tac_toe {
         } else {
             (O, game.o_player)
         }
+    }
+
+    #[view]
+    /// Retrieves the players, x then o.
+    public fun players(game_address: address, game_name: String): (address, address) acquires TicTacToeStore {
+        let game = get_game(game_address, game_name);
+        (game.x_player, game.o_player)
     }
 
     #[view]
