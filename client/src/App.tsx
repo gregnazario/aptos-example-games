@@ -81,6 +81,7 @@ function App(this: any) {
         let creator_address = await resolveToAddress(game_address);
         setGameCreator(creator_name);
         setGameIdAddress(creator_address);
+        setGameIdName(game_name);
         joinGameInner(game_address, game_name)
     }
 
