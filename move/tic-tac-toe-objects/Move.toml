@@ -1,0 +1,10 @@
+[package]
+name = 'ExampleTicTacToeObjects'
+version = '0.2.0'
+[dependencies.AptosFramework]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'main'
+subdir = 'aptos-move/framework/aptos-framework'
+
+[addresses]
+deploy_account = "_"

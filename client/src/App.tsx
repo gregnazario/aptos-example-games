@@ -9,13 +9,14 @@ import {matchPath} from "react-router";
 
 const {Paragraph} = Typography;
 
-// TODO: Load URL from wallet
-export const NODE_URL = "https://fullnode.mainnet.aptoslabs.com";
+// These three values allow you to change the network, address, and module name of the contract
+export const MODULE_ADDRESS = "0xb11affd5c514bb969e988710ef57813d9556cc1e3fe6dc9aa6a82b56aee53d98";
+export const MODULE_NAME = "tic_tac_toe_objects"
+export const NETWORK = "Devnet";
+// TODO: Load URL / network from wallet?
+export const NODE_URL = `https://fullnode.${NETWORK.toLowerCase()}.aptoslabs.com`;
 export const client = new AptosClient(NODE_URL);
 
-
-// TODO: make this more accessible / be deployed by others?
-export const moduleAddress = "0x3b36cac0ec1054b6a99facdef2a0015a2858ff75d10251590e606365394ac5bd";
 
 function App(this: any) {
     const NONE = 0;
@@ -155,7 +156,7 @@ function App(this: any) {
             // Run the view function to fetch the winner
             const winner_info = await client.view({
                 arguments: [gameAddress, gameName],
-                function: `${moduleAddress}::tic_tac_toe::winner`,
+                function: `${MODULE_ADDRESS}::${MODULE_NAME}::winner`,
                 type_arguments: []
             });
 
@@ -238,21 +239,21 @@ function App(this: any) {
             // Retrieve the whole board array via view function
             const result = await client.view({
                 arguments: [gameAddress, gameName],
-                function: `${moduleAddress}::tic_tac_toe::get_board`,
+                function: `${MODULE_ADDRESS}::${MODULE_NAME}::get_board`,
                 type_arguments: []
             })
 
             // Retrieve the next player by view function
             const current_player = await client.view({
                 arguments: [gameAddress, gameName],
-                function: `${moduleAddress}::tic_tac_toe::current_player`,
+                function: `${MODULE_ADDRESS}::${MODULE_NAME}::current_player`,
                 type_arguments: []
             });
 
             // Retrieve current players by view function
             const players = await client.view({
                 arguments: [gameAddress, gameName],
-                function: `${moduleAddress}::tic_tac_toe::players`,
+                function: `${MODULE_ADDRESS}::${MODULE_NAME}::players`,
                 type_arguments: []
             });
 
@@ -328,7 +329,7 @@ function App(this: any) {
         // Start the new game!
         const payload = {
             type: "entry_function_payload",
-            function: `${moduleAddress}::tic_tac_toe::start_game`,
+            function: `${MODULE_ADDRESS}::${MODULE_NAME}::start_game`,
             type_arguments: [],
             arguments: [gameName, x_address, o_address],
         };
@@ -360,7 +361,7 @@ function App(this: any) {
         setTransactionInProgress(true);
         const payload = {
             type: "entry_function_payload",
-            function: `${moduleAddress}::tic_tac_toe::reset_game`,
+            function: `${MODULE_ADDRESS}::${MODULE_NAME}::reset_game`,
             type_arguments: [],
             arguments: [gameIdAddress, gameIdName],
         };
@@ -392,7 +393,7 @@ function App(this: any) {
         setTransactionInProgress(true);
         const payload = {
             type: "entry_function_payload",
-            function: `${moduleAddress}::tic_tac_toe::delete_game`,
+            function: `${MODULE_ADDRESS}::${MODULE_NAME}::delete_game`,
             type_arguments: [],
             arguments: [gameIdName],
         };
@@ -420,7 +421,7 @@ function App(this: any) {
         setTransactionInProgress(true);
         const payload = {
             type: "entry_function_payload",
-            function: `${moduleAddress}::tic_tac_toe::play_space`,
+            function: `${MODULE_ADDRESS}::${MODULE_NAME}::play_space`,
             type_arguments: [],
             arguments: [gameIdAddress, gameIdName, space],
         };
@@ -456,10 +457,11 @@ function App(this: any) {
                 <Alert message={`Please connect your wallet`} type="info"/>
             }
             {
-                connected && network?.name as string !== 'Mainnet' &&
-                <Alert message={`Wallet is connected to ${network?.name}.  Please connect to mainnet`} type="warning"/>
+                connected && network?.name as string !== NETWORK &&
+                <Alert message={`Wallet is connected to ${network?.name}.  Please connect to ${NETWORK}`}
+                       type="warning"/>
             }
-            {connected && network?.name as string === "Mainnet" && <Spin spinning={transactionInProgress}>
+            {connected && network?.name as string === NETWORK && <Spin spinning={transactionInProgress}>
                 {!accountHasGame && (
                     <div>
                         <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
