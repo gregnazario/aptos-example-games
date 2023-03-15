@@ -445,7 +445,7 @@ function App(this: any) {
             <Layout>
                 <Row align="middle">
                     <Col span={10} offset={2}>
-                        <h1>Tic-Tac-Toe ({network?.name})</h1>
+                        <h1>Tic-Tac-Toe ({NETWORK})</h1>
                     </Col>
                     <Col span={12} style={{textAlign: "right", paddingRight: "200px"}}>
                         <WalletSelector/>
