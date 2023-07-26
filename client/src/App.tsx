@@ -9,8 +9,9 @@ import {matchPath} from "react-router";
 
 const {Paragraph} = Typography;
 
+export const NETWORK="testnet";
 // TODO: Load URL from wallet
-export const NODE_URL = "https://fullnode.mainnet.aptoslabs.com";
+export const NODE_URL = `https://fullnode.${NETWORK}.aptoslabs.com`;
 export const client = new AptosClient(NODE_URL);
 
 
@@ -456,10 +457,10 @@ function App(this: any) {
                 <Alert message={`Please connect your wallet`} type="info"/>
             }
             {
-                connected && network?.name as string !== 'Mainnet' &&
-                <Alert message={`Wallet is connected to ${network?.name}.  Please connect to mainnet`} type="warning"/>
+                connected && (network?.name as string).toLowerCase() !== NETWORK &&
+                <Alert message={`Wallet is connected to ${network?.name}.  Please connect to ${NETWORK}`} type="warning"/>
             }
-            {connected && network?.name as string === "Mainnet" && <Spin spinning={transactionInProgress}>
+            {connected && (network?.name as string).toLowerCase() === NETWORK && <Spin spinning={transactionInProgress}>
                 {!accountHasGame && (
                     <div>
                         <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
