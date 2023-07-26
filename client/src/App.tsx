@@ -9,7 +9,7 @@ import {matchPath} from "react-router";
 
 const {Paragraph} = Typography;
 
-export const NETWORK="testnet";
+export const NETWORK = "testnet";
 // TODO: Load URL from wallet
 export const NODE_URL = `https://fullnode.${NETWORK}.aptoslabs.com`;
 export const client = new AptosClient(NODE_URL);
@@ -42,7 +42,11 @@ function App(this: any) {
         name: ""
     });
     const [players, setPlayers] = useState<{ playerX: string, playerO: string }>({playerX: "", playerO: ""});
-    const [winner, setWinner] = useState<{ symbol: string, address: string, alert_type: "success" | "warning" | "error" }>({
+    const [winner, setWinner] = useState<{
+        symbol: string,
+        address: string,
+        alert_type: "success" | "warning" | "error"
+    }>({
         symbol: "",
         address: "",
         alert_type: "warning"
@@ -53,6 +57,14 @@ function App(this: any) {
 
     useEffect(() => {
         // On load, pull the game from the path, otherwise go to main menu
+        const poller = setInterval(loadGame, 10000);
+        return () => {
+            clearTimeout(poller);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [account, network?.name])
+
+    const loadGame = async () => {
         const match = matchPath("/game/:game_address/:game_name", window.location.pathname);
 
         if (match != null && match.params.game_address != null && match.params.game_name != null) {
@@ -62,8 +74,7 @@ function App(this: any) {
         } else if (account?.address != null) {
             setGameCreator(account?.address)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [account, network?.name])
+    }
 
     // Retrieves the address and name from the URL
     const getAddressAndNameFromURL = (): { address: string, name: string } => {
@@ -458,7 +469,8 @@ function App(this: any) {
             }
             {
                 connected && (network?.name as string).toLowerCase() !== NETWORK &&
-                <Alert message={`Wallet is connected to ${network?.name}.  Please connect to ${NETWORK}`} type="warning"/>
+                <Alert message={`Wallet is connected to ${network?.name}.  Please connect to ${NETWORK}`}
+                       type="warning"/>
             }
             {connected && (network?.name as string).toLowerCase() === NETWORK && <Spin spinning={transactionInProgress}>
                 {!accountHasGame && (
