@@ -9,7 +9,7 @@ import {MartianWallet} from "@martianwallet/aptos-wallet-adapter";
 import {PontemWallet} from "@pontem/wallet-adapter-plugin";
 import {TrustWallet} from "@trustwallet/aptos-wallet-adapter";
 import {
-    AptosWalletAdapterProvider,
+    AptosWalletAdapterProvider, NetworkName,
 } from "@aptos-labs/wallet-adapter-react";
 import {FewchaWallet} from "fewcha-plugin-wallet-adapter";
 import {MSafeWalletAdapter} from "msafe-plugin-wallet-adapter";
@@ -17,19 +17,13 @@ import {WelldoneWallet} from "@welldone-studio/aptos-wallet-adapter";
 import {NightlyWallet} from "@nightlylabs/aptos-wallet-adapter-plugin";
 import {IdentityConnectWallet} from '@identity-connect/wallet-adapter-plugin';
 import {Buffer as BufferPolyFill} from 'buffer';
-const icStagingUrl = 'https://identity-connect.staging.gcp.aptosdev.com';
+
 const icDappId = '56746ba8-b4e1-4ddf-9c59-3b406b5b5e2a';
-const icConfig = {
-    frontendBaseURL: icStagingUrl,
-    axiosConfig: { baseURL: icStagingUrl },
-};
 
 window.Buffer = BufferPolyFill;
 
-
-
 const wallets = [
-    new IdentityConnectWallet(icDappId, icConfig),
+    new IdentityConnectWallet(icDappId, NetworkName.Testnet),
     new PetraWallet(),
     new MartianWallet(),
     new PontemWallet(),
