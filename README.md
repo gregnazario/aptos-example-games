@@ -4,6 +4,9 @@
 is fully multiplayer.  There is a game creator, which is not allowed to modify the game unless it's finished.
 * It provides view functions to tell when there are winners, and to view the board
 
+## UI
+The UI is up, take a look at https://tic-tac-toe.gnazar.io
+
 ## How to install
 
 You can publish this with the aptos CLI (please version 1.0.6 or newer).  These instructions are for devnet, but you can simply
@@ -77,7 +80,3 @@ The game administrator account can always delete the game:
 ```
 aptos move run --function-id game::tic_tac_toe::delete_game --args address:game --profile game
 ```
-
-## TODO
-* Add a UI
-* Expand to other games, such as checkers
