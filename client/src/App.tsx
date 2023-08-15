@@ -455,10 +455,10 @@ function App(this: any) {
         <>
             <Layout>
                 <Row align="middle">
-                    <Col span={10} offset={2}>
+                    <Col flex={"auto"}>
                         <h1>Tic-Tac-Toe ({network?.name})</h1>
                     </Col>
-                    <Col span={12} style={{textAlign: "right", paddingRight: "200px"}}>
+                    <Col flex={12} style={{textAlign: "right", paddingRight: "200px"}}>
                         <WalletSelector/>
                     </Col>
                 </Row>
@@ -477,15 +477,19 @@ function App(this: any) {
                     <div>
                         <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
                             {gameNotFound &&
-                                <Col span={8} offset={8}>
+                                <Col flex={"auto"}>
                                     <Alert
                                         message={`Game ${getAddressAndNameFromURL().name} is not found at ${getAddressAndNameFromURL().address}`}
                                         type="error"/>
                                 </Col>
                             }
-                            <Col span={12} offset={8}>
-                                <Input.Group compact>
+                        </Row>
+                        <Input.Group compact>
+                            <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                <Col flex={"auto"}>
                                     <Paragraph>Game Creator</Paragraph>
+                                </Col>
+                                <Col flex={"auto"}>
                                     <Input
                                         onChange={(event) => {
                                             onChangeGameIdAddress(event)
@@ -495,7 +499,13 @@ function App(this: any) {
                                         size="large"
                                         defaultValue={gameIdAddress}
                                     />
+                                </Col>
+                            </Row>
+                            <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                <Col flex={"auto"}>
                                     <Paragraph>Game Name</Paragraph>
+                                </Col>
+                                <Col flex={"auto"}>
                                     <Input
                                         onChange={(event) => {
                                             onChangeGameIdName(event)
@@ -505,6 +515,10 @@ function App(this: any) {
                                         size="large"
                                         defaultValue={gameIdName}
                                     />
+                                </Col>
+                            </Row>
+                            <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                <Col flex={"auto"}>
                                     <Button
                                         onClick={() => joinGame()}
                                         type="primary"
@@ -512,11 +526,11 @@ function App(this: any) {
                                     >
                                         Join Game
                                     </Button>
-                                </Input.Group>
-                            </Col>
-                        </Row>
+                                </Col>
+                            </Row>
+                        </Input.Group>
                         <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
-                            <Col span={12} offset={8}>
+                            <Col flex={"auto"}>
                                 <Input.Group compact>
                                     <Input
                                         onChange={(event) => {
@@ -559,7 +573,7 @@ function App(this: any) {
                             </Col>
                         </Row>
                         <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
-                            <Col span={8} offset={8}>
+                            <Col flex={"auto"}>
                                 <p><b>How to play:</b>
                                     <li>Connect your wallet of choice with the button in the upper left</li>
                                     <li>To connect to an existing game, enter a game creator (APT Name or Address) into
@@ -579,124 +593,140 @@ function App(this: any) {
                         </Row>
                     </div>
                 )}
-                {accountHasGame && (<div>
-                        <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
-                            <Col span={8} offset={8}>
-                                <Button
-                                    onClick={() => mainMenu()}
-                                    type="primary"
-                                    style={{height: "40px", backgroundColor: "#3f67ff"}}
-                                >
-                                    Main Menu
-                                </Button>
-                            </Col>
-                        </Row>
-                        <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
-                            <Col span={8} offset={8}>
-                                <Descriptions title={`${gameCreator} : ${gameIdName}`} bordered size="middle">
-                                    <Descriptions.Item label="Player X" span={8}>{players.playerX}</Descriptions.Item>
-                                    <Descriptions.Item label="Player O" span={8}>{players.playerO}</Descriptions.Item>
-                                </Descriptions>
-                            </Col>
-                        </Row>
-                        <Input.Group>
+                {
+                    accountHasGame && (<div>
                             <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
-                                {!gameOver &&
-                                    <Col span={8} offset={8}>
-                                        <Alert
-                                            message={`Current player is ${currentPlayer.symbol} (${currentPlayer.name})`}/>
-                                    </Col>
-                                }
-                                {gameOver &&
-                                    <Col span={8} offset={8}>
-                                        <Alert message={`Winner is ${winner.symbol} (${winner.address})`}
-                                               type={winner.alert_type}/>
-                                    </Col>
-                                }
-                                <Col span={12} offset={8}>
-                                    <Button onClick={() => playSpace(0)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[0]}
-                                    </Button>
-                                    <Button onClick={() => playSpace(1)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[1]}
-                                    </Button>
-                                    <Button onClick={() => playSpace(2)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[2]}
+                                <Col flex={"auto"}>
+                                    <Button
+                                        onClick={() => mainMenu()}
+                                        type="primary"
+                                        style={{height: "40px", backgroundColor: "#3f67ff"}}
+                                    >
+                                        Main Menu
                                     </Button>
                                 </Col>
-                                <Col span={12} offset={8}>
-                                    <Button onClick={() => playSpace(3)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[3]}
-                                    </Button>
-                                    <Button onClick={() => playSpace(4)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[4]}
-                                    </Button>
-                                    <Button onClick={() => playSpace(5)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[5]}
-                                    </Button>
-                                </Col>
-                                <Col span={12} offset={8}>
-                                    <Button onClick={() => playSpace(6)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[6]}
-                                    </Button>
-                                    <Button onClick={() => playSpace(7)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[7]}
-                                    </Button>
-                                    <Button onClick={() => playSpace(8)} block type="primary"
-                                            style={{width: "80px", height: "80px"}}>
-                                        {board[8]}
-                                    </Button>
-                                </Col>
-                                {gameOver &&
-                                    <Col span={8} offset={8}>
-                                        <Button onClick={resetGame} block type="primary"
-                                                style={{height: "40px", backgroundColor: "#5f67ff"}}>
-                                            Play again?
-                                        </Button>
-                                    </Col>
-                                }
-                                {gameOver && gameIdAddress === account?.address &&
-                                    <Col span={8} offset={8}>
-                                        <Button onClick={deleteGame} block type="primary"
-                                                style={{height: "40px", backgroundColor: "#3f67ff"}}>
-                                            Delete game (only the game account can)
-                                        </Button>
-                                    </Col>
-                                }
                             </Row>
-                        </Input.Group>
-                        <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
-                            <Col span={8} offset={8}>
-                                <p><b>How to play:</b>
-                                    <li>Click the space that you'd like to play</li>
-                                    <li>Accept the transaction, or cancel and choose a new space</li>
-                                    <li>Wait for the other person to finish their turn and refresh (Sometime
-                                        auto-refresh will be added)
-                                    </li>
-                                    <li>The goal of the game is to get 3 in a row without getting blocked by the other
-                                        player.
-                                    </li>
-                                    <li>All rules of tic-tac-toe are enforced on-chain and cannot be cheated</li>
-                                    <li>When the game ends, either player can reset the game with "Play again"</li>
-                                    <li>If you're the creator of the game, you can delete the game entirely with "Delete
-                                        game"
-                                    </li>
-                                </p>
-                            </Col>
-                        </Row>
-                    </div>
-                )}
-            </Spin>}
+                            <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                <Col flex={"auto"}>
+                                    <Descriptions title={`${gameCreator} : ${gameIdName}`} bordered size="middle">
+                                        <Descriptions.Item label="Player X" span={8}>{players.playerX}</Descriptions.Item>
+                                        <Descriptions.Item label="Player O" span={8}>{players.playerO}</Descriptions.Item>
+                                    </Descriptions>
+                                </Col>
+                            </Row>
+                            <Input.Group>
+                                <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                    {!gameOver &&
+                                        <Col flex={"auto"}>
+                                            <Alert
+                                                message={`Current player is ${currentPlayer.symbol} (${currentPlayer.name})`}/>
+                                        </Col>
+                                    }
+                                    {gameOver &&
+                                        <Col flex={"auto"}>
+                                            <Alert message={`Winner is ${winner.symbol} (${winner.address})`}
+                                                   type={winner.alert_type}/>
+                                        </Col>
+                                    }
+                                </Row>
+                                <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                    <Col flex={1}/>
+                                    <Col flex={"auto"}>
+                                        <Button onClick={() => playSpace(0)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[0]}
+                                        </Button>
+                                        <Button onClick={() => playSpace(1)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[1]}
+                                        </Button>
+                                        <Button onClick={() => playSpace(2)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[2]}
+                                        </Button>
+                                    </Col>
+                                </Row>
+                                <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                    <Col flex={1}/>
+                                    <Col flex={"auto"}>
+                                        <Button onClick={() => playSpace(3)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[3]}
+                                        </Button>
+                                        <Button onClick={() => playSpace(4)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[4]}
+                                        </Button>
+                                        <Button onClick={() => playSpace(5)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[5]}
+                                        </Button>
+                                    </Col>
+                                </Row>
+                                <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                    <Col flex={1}/>
+                                    <Col flex={"auto"}>
+                                        <Button onClick={() => playSpace(6)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[6]}
+                                        </Button>
+                                        <Button onClick={() => playSpace(7)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[7]}
+                                        </Button>
+                                        <Button onClick={() => playSpace(8)} block type="primary"
+                                                style={{width: "80px", height: "80px"}}>
+                                            {board[8]}
+                                        </Button>
+                                    </Col>
+                                </Row>
+                                <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                    {gameOver &&
+                                        <Col flex={"auto"}>
+                                            <Button onClick={resetGame} block type="primary"
+                                                    style={{height: "40px", backgroundColor: "#5f67ff"}}>
+                                                Play again?
+                                            </Button>
+                                        </Col>
+                                    }
+                                    {gameOver && gameIdAddress === account?.address &&
+                                        <Col flex={"auto"}>
+                                            <Button onClick={deleteGame} block type="primary"
+                                                    style={{height: "40px", backgroundColor: "#3f67ff"}}>
+                                                Delete game (only the game account can)
+                                            </Button>
+                                        </Col>
+                                    }
+                                </Row>
+                            </Input.Group>
+                            <Row align="middle" gutter={[0, 32]} style={{marginTop: "2rem"}}>
+                                <Col flex={"auto"}>
+                                    <p><b>How to play:</b>
+                                        <li>Click the space that you'd like to play</li>
+                                        <li>Accept the transaction, or cancel and choose a new space</li>
+                                        <li>Wait for the other person to finish their turn and refresh (Sometime
+                                            auto-refresh will be added)
+                                        </li>
+                                        <li>The goal of the game is to get 3 in a row without getting blocked by the other
+                                            player.
+                                        </li>
+                                        <li>All rules of tic-tac-toe are enforced on-chain and cannot be cheated</li>
+                                        <li>When the game ends, either player can reset the game with "Play again"</li>
+                                        <li>If you're the creator of the game, you can delete the game entirely with "Delete
+                                            game"
+                                        </li>
+                                    </p>
+                                </Col>
+                            </Row>
+                        </div>
+                    )
+                }
+            </Spin>
+            }
+
         </>
-    );
+    )
+        ;
 }
 
 export default App;
