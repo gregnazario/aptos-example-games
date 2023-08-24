@@ -10,7 +10,7 @@
     "@babel/plugin-syntax-flow": "^7.22.5",
     "@babel/plugin-transform-react-jsx": "^7.22.5",
     "@blocto/aptos-wallet-adapter-plugin": "^0.2.3",
-    "@identity-connect/wallet-adapter-plugin": "^0.0.12",
+    "@identity-connect/wallet-adapter-plugin": "^0.0.13",
     "@martianwallet/aptos-wallet-adapter": "^0.0.4",
     "@nightlylabs/aptos-wallet-adapter-plugin": "^0.2.12",
     "@pontem/wallet-adapter-plugin": "^0.2.0",
