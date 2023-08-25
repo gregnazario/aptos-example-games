@@ -18,7 +18,7 @@ import {NightlyWallet} from "@nightlylabs/aptos-wallet-adapter-plugin";
 import {IdentityConnectWallet} from '@identity-connect/wallet-adapter-plugin';
 import {Buffer as BufferPolyFill} from 'buffer';
 
-const icDappId = '56746ba8-b4e1-4ddf-9c59-3b406b5b5e2a';
+const icDappId = '241a8a91-8978-4c79-846a-b0d34f3006a9';
 
 window.Buffer = BufferPolyFill;
 
