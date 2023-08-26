@@ -24,9 +24,10 @@ module deploy_account::checkers {
     const EGAME_OVER: u64 = 4;
     /// Not player turn
     const ENOT_PLAYER_TURN: u64 = 5;
-
     /// Board state is invalid
     const EINVALID_STATE: u64 = 6;
+    /// Invalid piece, either an empty space tried to be moved, or the wrong color
+    const EINVALID_PIECE: u64 = 7;
 
     const BOARD_SIZE: u64 = 32;
 
@@ -63,26 +64,26 @@ module deploy_account::checkers {
 
             // Put in a whole line when at the beginning of a row
             if (left_side_of_board(i)) {
-                string::append_utf8(&mut pretty, b"------------------------\n");
+                //string::append_utf8(&mut pretty, b"-----------------\n");
             };
 
             // If it's the even rows, it needs a space before
             if (row_number % 2 == 0) {
-                string::append_utf8(&mut pretty, b"| |")
+                string::append_utf8(&mut pretty, b"| ")
             };
 
             // Put piece in
             let space_value = *vector::borrow(&spaces, i);
             let space = if (space_value == NONE) {
-                b"| |"
+                b"| "
             } else if (space_value == RED) {
-                b"|r|"
+                b"|r"
             } else if (space_value == BLACK) {
-                b"|b|"
+                b"|b"
             } else if (space_value == RED_KING) {
-                b"|R|"
+                b"|R"
             } else if (space_value == BLACK_KING) {
-                b"|B|"
+                b"|B"
             } else {
                 abort EINVALID_STATE
             };
@@ -90,17 +91,18 @@ module deploy_account::checkers {
 
             // If it's the odd rows, it needs a space after
             if (row_number % 2 == 1) {
-                string::append_utf8(&mut pretty, b"| |")
+                string::append_utf8(&mut pretty, b"| ")
             };
 
             if (right_side_of_board(i)) {
                 // Put in a new line at the end of the line
-                string::append_utf8(&mut pretty, b"\n")
-            }
+                string::append_utf8(&mut pretty, b"|\n")
+            };
+            i = i + 1;
         };
 
-        // Put in the line at hte end for good looks
-        string::append_utf8(&mut pretty, b"------------------------");
+        // Put in the line at the end for good looks
+        //string::append_utf8(&mut pretty, b"-----------------");
 
         pretty
     }
@@ -140,7 +142,8 @@ module deploy_account::checkers {
                 vector::push_back(&mut spaces, BLACK);
             } else {
                 vector::push_back(&mut spaces, NONE);
-            }
+            };
+            i = i + 1;
         };
 
         let board = Board {
@@ -163,7 +166,7 @@ module deploy_account::checkers {
         // Fetch board
         let board = borrow_global_mut<Board>(game_address);
 
-        assert!(board.winner != NONE, EGAME_OVER);
+        assert!(board.winner == NONE, EGAME_OVER);
         let player_is_red = if (signer::address_of(player) == board.red_player) {
             assert!(board.player == RED, ENOT_PLAYER_TURN);
             true
@@ -178,9 +181,9 @@ module deploy_account::checkers {
         assert!(is_occupied(space), ENO_PIECE_AT_LOCATION);
 
         if (player_is_red) {
-            assert!(is_red(space), EINVALID_MOVE);
+            assert!(is_red(space), EINVALID_PIECE);
         } else {
-            assert!(is_black(space), EINVALID_MOVE);
+            assert!(is_black(space), EINVALID_PIECE);
         };
 
         let is_jump = if (is_king(space)) {
@@ -239,8 +242,16 @@ module deploy_account::checkers {
         if (!player_has_pieces_left(board, !player_is_red)) {
             if (player_is_red) {
                 board.winner = RED;
+                board.player = NONE;
             } else {
                 board.winner = BLACK;
+                board.player = NONE;
+            }
+        } else {
+            if (player_is_red) {
+                board.player = BLACK;
+            } else {
+                board.player = RED;
             }
         }
     }
@@ -270,8 +281,10 @@ module deploy_account::checkers {
         if (within_board(new_location)) {
             false
         } else if (left_side_of_board(location)) {
+            // FIXME: Edge conditions
             step_down_right(board, location, new_location)
         } else if (right_side_of_board(location)) {
+            // FIXME: Edge conditions
             step_down_left(board, location, new_location)
         } else {
             step_down_right(board, location, new_location) ||
@@ -283,8 +296,10 @@ module deploy_account::checkers {
         if (within_board(new_location)) {
             false
         } else if (left_side_of_board(location)) {
+            // FIXME: Edge conditions
             jump_down_right(board, red_player, location, new_location)
         } else if (right_side_of_board(location)) {
+            // FIXME: Edge conditions
             jump_down_left(board, red_player, location, new_location)
         } else {
             jump_down_right(board, red_player, location, new_location) ||
@@ -296,8 +311,10 @@ module deploy_account::checkers {
         if (within_board(new_location) || top_row_of_board(location)) {
             false
         } else if (left_side_of_board(location)) {
+            // FIXME: Edge conditions
             step_up_right(board, location, new_location)
         } else if (right_side_of_board(location)) {
+            // FIXME: Edge conditions
             step_up_left(board, location, new_location)
         } else {
             step_up_right(board, location, new_location) ||
@@ -309,8 +326,10 @@ module deploy_account::checkers {
         if (within_board(new_location) || top_two_rows_of_board(location)) {
             false
         } else if (left_side_of_board(location)) {
+            // FIXME: Edge conditions
             jump_up_right(board, red_player, location, new_location)
         } else if (right_side_of_board(location)) {
+            // FIXME: Edge conditions
             jump_up_left(board, red_player, location, new_location)
         } else {
             jump_up_right(board, red_player, location, new_location) ||
