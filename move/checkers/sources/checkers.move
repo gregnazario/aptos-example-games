@@ -280,11 +280,9 @@ module deploy_account::checkers {
     fun valid_step_down(board: &Board, location: u64, new_location: u64): bool {
         if (within_board(new_location)) {
             false
-        } else if (left_side_of_board(location)) {
-            // FIXME: Edge conditions
+        } else if (left_side_of_board(location) && odd_row(location)) {
             step_down_right(board, location, new_location)
-        } else if (right_side_of_board(location)) {
-            // FIXME: Edge conditions
+        } else if (right_side_of_board(location) && even_row(location)) {
             step_down_left(board, location, new_location)
         } else {
             step_down_right(board, location, new_location) ||
@@ -295,11 +293,9 @@ module deploy_account::checkers {
     fun valid_jump_down(board: &Board, red_player: bool, location: u64, new_location: u64): bool {
         if (within_board(new_location)) {
             false
-        } else if (left_side_of_board(location)) {
-            // FIXME: Edge conditions
+        } else if (left_side_of_board(location) && odd_row(location)) {
             jump_down_right(board, red_player, location, new_location)
-        } else if (right_side_of_board(location)) {
-            // FIXME: Edge conditions
+        } else if (right_side_of_board(location) && even_row(location)) {
             jump_down_left(board, red_player, location, new_location)
         } else {
             jump_down_right(board, red_player, location, new_location) ||
@@ -310,11 +306,9 @@ module deploy_account::checkers {
     fun valid_step_up(board: &Board, location: u64, new_location: u64): bool {
         if (within_board(new_location) || top_row_of_board(location)) {
             false
-        } else if (left_side_of_board(location)) {
-            // FIXME: Edge conditions
+        } else if (left_side_of_board(location) && odd_row(location)) {
             step_up_right(board, location, new_location)
-        } else if (right_side_of_board(location)) {
-            // FIXME: Edge conditions
+        } else if (right_side_of_board(location) && even_row(location)) {
             step_up_left(board, location, new_location)
         } else {
             step_up_right(board, location, new_location) ||
@@ -325,11 +319,9 @@ module deploy_account::checkers {
     fun valid_jump_up(board: &Board, red_player: bool, location: u64, new_location: u64): bool {
         if (within_board(new_location) || top_two_rows_of_board(location)) {
             false
-        } else if (left_side_of_board(location)) {
-            // FIXME: Edge conditions
+        } else if (left_side_of_board(location) && odd_row(location)) {
             jump_up_right(board, red_player, location, new_location)
-        } else if (right_side_of_board(location)) {
-            // FIXME: Edge conditions
+        } else if (right_side_of_board(location) && even_row(location)) {
             jump_up_left(board, red_player, location, new_location)
         } else {
             jump_up_right(board, red_player, location, new_location) ||
@@ -341,20 +333,36 @@ module deploy_account::checkers {
         location > BOARD_SIZE
     }
 
+    inline fun row(location: u64): u64 {
+        location / 4
+    }
+
+    inline fun col(location: u64): u64 {
+        location % 4
+    }
+
     inline fun top_row_of_board(location: u64): bool {
-        location / 4 == 0
+        row(location) == 0
     }
 
     inline fun top_two_rows_of_board(location: u64): bool {
-        location / 4 < 2
+        row(location) < 2
+    }
+
+    inline fun even_row(location: u64): bool {
+        row(location) % 2 == 0
+    }
+
+    inline fun odd_row(location: u64): bool {
+        row(location) % 2 == 1
     }
 
     inline fun left_side_of_board(location: u64): bool {
-        location % 4 == 0
+        col(location) == 0
     }
 
     inline fun right_side_of_board(location: u64): bool {
-        location % 4 == 3
+        col(location) == 3
     }
 
     inline fun jump_down_right(board: &Board, red_player: bool, location: u64, new_location: u64): bool {
