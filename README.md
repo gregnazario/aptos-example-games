@@ -7,7 +7,7 @@ is fully multiplayer.  There is a game creator, which is not allowed to modify t
 ## UI
 The UI is up, take a look at https://tic-tac-toe.gnazar.io
 
-## How to install
+## How to publish game Move code
 
 You can publish this with the aptos CLI (please version 1.0.6 or newer).  These instructions are for devnet, but you can simply
 use a testnet / mainnet account instead.
@@ -16,6 +16,17 @@ use a testnet / mainnet account instead.
 aptos init --profile game --network devnet
 cd move
 aptos move publish --named-addresses deploy_account=game --profile game
+```
+
+## How to start local dapp website (at localhost:3000
+
+This will start a local server at localhost:3000 which will access the contract.  You may need to change some of the addresses
+if you redeployed it.
+
+```
+cd client
+npm install
+npm start
 ```
 
 ## How to play (without a UI and just the CLI)
