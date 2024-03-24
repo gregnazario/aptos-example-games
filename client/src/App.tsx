@@ -9,9 +9,9 @@ import {matchPath} from "react-router";
 
 const {Paragraph} = Typography;
 
-export const NETWORK = "testnet";
+export const NETWORK = "devnet";
 // TODO: Load URL from wallet
-export const NODE_URL = `https://fullnode.${NETWORK}.aptoslabs.com`;
+export const NODE_URL = `https://api.${NETWORK}.aptoslabs.com/v1`;
 export const client = new AptosClient(NODE_URL);
 
 
@@ -339,10 +339,10 @@ function App(this: any) {
 
         // Start the new game!
         const payload = {
-            type: "entry_function_payload",
-            function: `${moduleAddress}::tic_tac_toe::start_game`,
-            type_arguments: [],
-            arguments: [gameName, x_address, o_address],
+            data: {
+                function: `${moduleAddress}::tic_tac_toe::start_game` as `${string}::${string}::${string}`,
+                functionArguments: [gameName, x_address, o_address],
+            }
         };
 
         try {
@@ -371,10 +371,10 @@ function App(this: any) {
         if (!account) return [];
         setTransactionInProgress(true);
         const payload = {
-            type: "entry_function_payload",
-            function: `${moduleAddress}::tic_tac_toe::reset_game`,
-            type_arguments: [],
-            arguments: [gameIdAddress, gameIdName],
+            data: {
+                function: `${moduleAddress}::tic_tac_toe::reset_game` as `${string}::${string}::${string}`,
+                functionArguments: [gameIdAddress, gameIdName],
+            },
         };
 
         try {
@@ -403,10 +403,10 @@ function App(this: any) {
 
         setTransactionInProgress(true);
         const payload = {
-            type: "entry_function_payload",
-            function: `${moduleAddress}::tic_tac_toe::delete_game`,
-            type_arguments: [],
-            arguments: [gameIdName],
+            data: {
+                function: `${moduleAddress}::tic_tac_toe::delete_game` as `${string}::${string}::${string}`,
+                functionArguments: [gameIdName],
+            }
         };
 
         try {
@@ -431,10 +431,10 @@ function App(this: any) {
         if (!account) return [];
         setTransactionInProgress(true);
         const payload = {
-            type: "entry_function_payload",
-            function: `${moduleAddress}::tic_tac_toe::play_space`,
-            type_arguments: [],
-            arguments: [gameIdAddress, gameIdName, space],
+            data: {
+                function: `${moduleAddress}::tic_tac_toe::play_space` as `${string}::${string}::${string}`,
+                functionArguments: [gameIdAddress, gameIdName, space],
+            }
         };
 
         try {
