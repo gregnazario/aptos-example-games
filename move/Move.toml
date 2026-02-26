@@ -3,8 +3,11 @@ name = 'ExampleTicTacToe'
 version = '0.2.0'
 [dependencies.AptosFramework]
 git = 'https://github.com/aptos-labs/aptos-core.git'
-rev = 'main'
+rev = 'mainnet'
 subdir = 'aptos-move/framework/aptos-framework'
 
 [addresses]
 deploy_account = "_"
+
+[dev-addresses]
+deploy_account = "0xCAFE"
