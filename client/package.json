@@ -21,10 +21,6 @@
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.69",
     "@types/react-dom": "^18.2.22",
-    "@babel/core": "^7.22.10",
-    "@babel/plugin-syntax-flow": "^7.22.5",
-    "@babel/plugin-transform-react-jsx": "^7.22.5",
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "vite": "^5.2.6",
     "@vitejs/plugin-react": "^4.2.1"
   },
@@ -32,22 +28,5 @@
     "start": "vite",
     "build": "vite build",
     "serve": "vite preview"
-  },
-  "eslintConfig": {
-    "extends": [
-      "vite"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
   }
 }
