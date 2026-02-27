@@ -1,19 +1,21 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import "./index.css";
+import { Network } from "@aptos-labs/ts-sdk";
 import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
-import { Buffer as BufferPolyFill } from "buffer";
-import { PetraWallet } from "petra-plugin-wallet-adapter";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
 import App from "./App";
+import "./index.css";
 
-window.Buffer = BufferPolyFill;
+const rootEl = document.getElementById("root");
+if (!rootEl) throw new Error("Root element not found");
 
-const wallets = [new PetraWallet()];
-const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
-root.render(
-	<React.StrictMode>
-		<AptosWalletAdapterProvider plugins={wallets} autoConnect={true}>
+createRoot(rootEl).render(
+	<StrictMode>
+		<AptosWalletAdapterProvider
+			autoConnect={true}
+			dappConfig={{ network: Network.DEVNET }}
+			onError={(error) => console.error("Wallet error:", error)}
+		>
 			<App />
 		</AptosWalletAdapterProvider>
-	</React.StrictMode>,
+	</StrictMode>,
 );

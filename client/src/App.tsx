@@ -1,21 +1,26 @@
-import { WalletSelector } from "@aptos-labs/wallet-adapter-ant-design";
-import { Alert, Button, Col, Descriptions, Input, Layout, Row, Spin, Typography } from "antd";
-import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { AptosClient } from "aptos";
-import { createBrowserHistory } from "history";
 import { type ChangeEvent, useEffect, useState } from "react";
-import { matchPath } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { WalletSelector } from "@/components/WalletSelector";
 
-const { Paragraph } = Typography;
+const config = new AptosConfig({ network: Network.DEVNET });
+const aptos = new Aptos(config);
 
 export const NETWORK = "devnet";
-// TODO: Load URL from wallet
-export const NODE_URL = `https://api.${NETWORK}.aptoslabs.com/v1`;
-export const client = new AptosClient(NODE_URL);
 
 // TODO: make this more accessible / be deployed by others?
 export const moduleAddress = "0x3b36cac0ec1054b6a99facdef2a0015a2858ff75d10251590e606365394ac5bd";
+
+// Extract game info from URL using native APIs
+const getGameFromURL = (): { address: string; name: string } | null => {
+	const match = window.location.pathname.match(/^\/game\/([^/]+)\/([^/]+)$/);
+	if (match) return { address: match[1], name: match[2] };
+	return null;
+};
 
 function App() {
 	const NONE = 0;
@@ -59,17 +64,14 @@ function App() {
 	});
 	const [board, setBoard] = useState<string[]>(["", "", "", "", "", "", "", "", ""]);
 	const { account, network, connected, signAndSubmitTransaction } = useWallet();
-	const browserHistory = createBrowserHistory();
 
 	const loadGame = async () => {
-		const match = matchPath("/game/:game_address/:game_name", window.location.pathname);
+		const gameInfo = getGameFromURL();
 
-		if (match != null && match.params.game_address != null && match.params.game_name != null) {
-			const game_address = match.params.game_address;
-			const game_name = match.params.game_name;
-			setup_game_on_load(game_address, game_name).catch(console.error);
+		if (gameInfo != null) {
+			setup_game_on_load(gameInfo.address, gameInfo.name).catch(console.error);
 		} else if (account?.address != null) {
-			setGameCreator(account?.address);
+			setGameCreator(account.address.toString());
 		}
 	};
 
@@ -82,17 +84,6 @@ function App() {
 			clearInterval(poller);
 		};
 	}, []);
-
-	// Retrieves the address and name from the URL
-	const getAddressAndNameFromURL = (): { address: string; name: string } => {
-		const match = matchPath("/game/:game_address/:game_name", window.location.pathname);
-
-		if (match != null && match.params.game_address != null && match.params.game_name != null) {
-			return { address: match.params.game_address, name: match.params.game_name };
-		} else {
-			return { address: "", name: "" };
-		}
-	};
 
 	// Sets up the game on load.  has to be done this way since no await in use effect
 	const setup_game_on_load = async (game_address: string, game_name: string) => {
@@ -116,7 +107,7 @@ function App() {
 		setGameIdAddress(address);
 	};
 
-	// Listener for changing the X Address input box
+	// Listener for changing the Game Name input box
 	const onChangeGameName = async (event: ChangeEvent<HTMLInputElement>) => {
 		const value = event.target.value;
 		setGameName(value);
@@ -174,10 +165,11 @@ function App() {
 	const fetchWinner = async (gameAddress: string, gameName: string) => {
 		try {
 			// Run the view function to fetch the winner
-			const winner_info = await client.view({
-				arguments: [gameAddress, gameName],
-				function: `${moduleAddress}::tic_tac_toe::winner`,
-				type_arguments: [],
+			const winner_info = await aptos.view({
+				payload: {
+					function: `${moduleAddress}::tic_tac_toe::winner`,
+					functionArguments: [gameAddress, gameName],
+				},
 			});
 
 			// Check the player who won, lost, or had a draw
@@ -204,10 +196,10 @@ function App() {
 			}
 
 			// If the current player won, display a green banner, yellow if draw, red if lost
-			const player_address = account?.address;
+			const player_address = account?.address?.toString();
 			if (winner_symbol === "Draw") {
 				type = "warning";
-			} else if (player_address !== null && winner_address === player_address) {
+			} else if (player_address != null && winner_address === player_address) {
 				// TODO: Handle matching different representations (missing 0 at beginning)
 				type = "success";
 			} else {
@@ -225,7 +217,7 @@ function App() {
 	// Return to the main menu
 	const mainMenu = async () => {
 		// Hide the board, go back to main page
-		browserHistory.push(`/`);
+		window.history.pushState({}, "", "/");
 		setAccountHasGame(false);
 	};
 
@@ -242,8 +234,7 @@ function App() {
 		setGameCreator(creator_name);
 		setGameIdAddress(creator_address);
 		// First save the game address
-		const browserHistory = createBrowserHistory();
-		browserHistory.push(`/game/${creator_name}/${gameName}`);
+		window.history.pushState({}, "", `/game/${creator_name}/${gameName}`);
 
 		// Now fetch game
 		await fetchGame(creator_address, gameName);
@@ -257,24 +248,27 @@ function App() {
 
 		try {
 			// Retrieve the whole board array via view function
-			const result = await client.view({
-				arguments: [gameAddress, gameName],
-				function: `${moduleAddress}::tic_tac_toe::get_board`,
-				type_arguments: [],
+			const result = await aptos.view({
+				payload: {
+					function: `${moduleAddress}::tic_tac_toe::get_board`,
+					functionArguments: [gameAddress, gameName],
+				},
 			});
 
 			// Retrieve the next player by view function
-			const current_player = await client.view({
-				arguments: [gameAddress, gameName],
-				function: `${moduleAddress}::tic_tac_toe::current_player`,
-				type_arguments: [],
+			const current_player = await aptos.view({
+				payload: {
+					function: `${moduleAddress}::tic_tac_toe::current_player`,
+					functionArguments: [gameAddress, gameName],
+				},
 			});
 
 			// Retrieve current players by view function
-			const players = await client.view({
-				arguments: [gameAddress, gameName],
-				function: `${moduleAddress}::tic_tac_toe::players`,
-				type_arguments: [],
+			const players = await aptos.view({
+				payload: {
+					function: `${moduleAddress}::tic_tac_toe::players`,
+					functionArguments: [gameAddress, gameName],
+				},
 			});
 
 			// Resolve names for players
@@ -302,11 +296,11 @@ function App() {
 
 			// Run through each square in the board, and populate the board
 			const layout = ["", "", "", "", "", "", "", "", ""];
-			const board = result[0] as string;
+			const boardData = result[0] as string;
 			let index = 0;
-			for (let i = 2; i < board.length; i += 2) {
+			for (let i = 2; i < boardData.length; i += 2) {
 				// Convert from string to number because it's a u64
-				const symbol_num = Number(board[i + 1]);
+				const symbol_num = Number(boardData[i + 1]);
 				if (symbol_num === NONE) {
 					layout[index] = " ";
 				} else if (symbol_num === X) {
@@ -318,7 +312,6 @@ function App() {
 			}
 
 			// Setup all the board display information
-
 			setPlayers({ playerX: playerX, playerO: playerO });
 			setCurrentPlayer({ symbol: player_symbol, address: player_address, name: player_name });
 			setBoard(layout);
@@ -357,15 +350,15 @@ function App() {
 		try {
 			// sign and submit transaction to chain, waiting for it to complete
 			const response = await signAndSubmitTransaction(payload);
-			await client.waitForTransaction(response.hash);
+			await aptos.waitForTransaction({ transactionHash: response.hash });
 
 			// Initialize the local state
-			setGameIdAddress(account.address);
+			const addr = account.address.toString();
+			setGameIdAddress(addr);
 			setGameIdName(gameName);
-			const browserHistory = createBrowserHistory();
-			browserHistory.push(`/game/${account.address}/${gameName}`);
+			window.history.pushState({}, "", `/game/${addr}/${gameName}`);
 			setAccountHasGame(true);
-			await fetchGame(account.address, gameName);
+			await fetchGame(addr, gameName);
 		} catch (_error: unknown) {
 			// TODO: Display banner of error of creation
 			setAccountHasGame(false);
@@ -388,7 +381,7 @@ function App() {
 
 		try {
 			const response = await signAndSubmitTransaction(payload);
-			await client.waitForTransaction(response.hash);
+			await aptos.waitForTransaction({ transactionHash: response.hash });
 
 			// Cleanup state from previous game
 			setAccountHasGame(true);
@@ -408,7 +401,7 @@ function App() {
 		if (!account) return [];
 
 		// If it's not the correct address, not lets accidentally delete the wrong game
-		if (gameIdAddress !== account?.address) return [];
+		if (gameIdAddress !== account.address.toString()) return [];
 
 		setTransactionInProgress(true);
 		const payload = {
@@ -420,7 +413,7 @@ function App() {
 
 		try {
 			const response = await signAndSubmitTransaction(payload);
-			await client.waitForTransaction(response.hash);
+			await aptos.waitForTransaction({ transactionHash: response.hash });
 			// Refresh state
 			setAccountHasGame(false);
 			setWinner({ symbol: "", address: "", alert_type: "warning" });
@@ -448,7 +441,7 @@ function App() {
 
 		try {
 			const response = await signAndSubmitTransaction(payload);
-			await client.waitForTransaction(response.hash);
+			await aptos.waitForTransaction({ transactionHash: response.hash });
 			setAccountHasGame(true);
 		} catch (_error: unknown) {
 			setAccountHasGame(false);
@@ -460,132 +453,130 @@ function App() {
 		await fetchGame(gameIdAddress, gameIdName);
 	};
 
+	const networkName = network?.name ? (network.name as string).toLowerCase() : "";
+
 	return (
-		<>
-			<Layout>
-				<Row align="middle">
-					<Col flex={"auto"}>
-						<h1>Tic-Tac-Toe ({network?.name})</h1>
-					</Col>
-					<Col flex={12} style={{ textAlign: "right", paddingRight: "200px" }}>
-						<WalletSelector />
-					</Col>
-				</Row>
-			</Layout>
-			{!connected && <Alert message={`Please connect your wallet`} type="info" />}
-			{connected && (network?.name as string).toLowerCase() !== NETWORK && (
-				<Alert
-					message={`Wallet is connected to ${network?.name}.  Please connect to ${NETWORK}`}
-					type="warning"
-				/>
+		<div className="min-h-screen bg-background">
+			{/* Header */}
+			<header className="flex items-center justify-between border-b px-6 py-4">
+				<h1 className="text-xl font-bold">Tic-Tac-Toe ({network?.name ?? "unknown"})</h1>
+				<WalletSelector />
+			</header>
+
+			{/* Alerts */}
+			{!connected && (
+				<Alert className="mx-6 mt-4">
+					<AlertDescription>Please connect your wallet</AlertDescription>
+				</Alert>
 			)}
-			{connected && (network?.name as string).toLowerCase() === NETWORK && (
-				<Spin spinning={transactionInProgress}>
+			{connected && networkName !== NETWORK && (
+				<Alert variant="destructive" className="mx-6 mt-4">
+					<AlertDescription>
+						Wallet is connected to {network?.name}. Please connect to {NETWORK}
+					</AlertDescription>
+				</Alert>
+			)}
+
+			{/* Main content */}
+			{connected && networkName === NETWORK && (
+				<main
+					className={`mx-auto max-w-2xl px-6 py-8 ${transactionInProgress ? "opacity-50 pointer-events-none" : ""}`}
+				>
 					{!accountHasGame && (
-						<div>
-							<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-								{gameNotFound && (
-									<Col flex={"auto"}>
-										<Alert
-											message={`Game ${getAddressAndNameFromURL().name} is not found at ${getAddressAndNameFromURL().address}`}
-											type="error"
-										/>
-									</Col>
-								)}
-							</Row>
-							<Input.Group compact>
-								<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-									<Col flex={"auto"}>
-										<Paragraph>Game Creator</Paragraph>
-									</Col>
-									<Col flex={"auto"}>
+						<div className="space-y-8">
+							{/* Game not found alert */}
+							{gameNotFound && (
+								<Alert variant="destructive">
+									<AlertDescription>
+										Game {getGameFromURL()?.name ?? ""} is not found at{" "}
+										{getGameFromURL()?.address ?? ""}
+									</AlertDescription>
+								</Alert>
+							)}
+
+							{/* Join Game form */}
+							<Card>
+								<CardHeader>
+									<CardTitle>Join Existing Game</CardTitle>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<div className="space-y-2">
+										<label className="text-sm font-medium" htmlFor="game-creator">
+											Game Creator
+										</label>
 										<Input
-											onChange={(event) => {
-												onChangeGameIdAddress(event);
-											}}
-											style={{ width: "calc(100% - 60px)" }}
-											placeholder="Game Creator"
-											size="large"
+											id="game-creator"
+											onChange={onChangeGameIdAddress}
+											placeholder="Game Creator (address or .apt name)"
 											defaultValue={gameIdAddress}
 										/>
-									</Col>
-								</Row>
-								<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-									<Col flex={"auto"}>
-										<Paragraph>Game Name</Paragraph>
-									</Col>
-									<Col flex={"auto"}>
+									</div>
+									<div className="space-y-2">
+										<label className="text-sm font-medium" htmlFor="game-name-join">
+											Game Name
+										</label>
 										<Input
-											onChange={(event) => {
-												onChangeGameIdName(event);
-											}}
-											style={{ width: "calc(100% - 60px)" }}
+											id="game-name-join"
+											onChange={onChangeGameIdName}
 											placeholder="Game Name"
-											size="large"
 											defaultValue={gameIdName}
 										/>
-									</Col>
-								</Row>
-								<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-									<Col flex={"auto"}>
-										<Button
-											onClick={() => joinGame()}
-											type="primary"
-											style={{ height: "40px", backgroundColor: "#3f67ff" }}
-										>
-											Join Game
-										</Button>
-									</Col>
-								</Row>
-							</Input.Group>
-							<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-								<Col flex={"auto"}>
-									<Input.Group compact>
+									</div>
+									<Button onClick={() => joinGame()}>Join Game</Button>
+								</CardContent>
+							</Card>
+
+							{/* Create Game form */}
+							<Card>
+								<CardHeader>
+									<CardTitle>Create New Game</CardTitle>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<div className="space-y-2">
+										<label className="text-sm font-medium" htmlFor="new-game-name">
+											Game Name
+										</label>
 										<Input
-											onChange={(event) => {
-												onChangeGameName(event);
-											}}
-											style={{ width: "calc(100% - 60px)" }}
+											id="new-game-name"
+											onChange={onChangeGameName}
 											placeholder="Game Name"
-											size="large"
 											defaultValue={gameName}
 										/>
-
+									</div>
+									<div className="space-y-2">
+										<label className="text-sm font-medium" htmlFor="player-x">
+											Player X Address
+										</label>
 										<Input
-											onChange={(event) => {
-												onChangeXAddress(event);
-											}}
-											style={{ width: "calc(100% - 60px)" }}
+											id="player-x"
+											onChange={onChangeXAddress}
 											placeholder="Player X Address"
-											size="large"
 											defaultValue={XAddress}
 										/>
-
+									</div>
+									<div className="space-y-2">
+										<label className="text-sm font-medium" htmlFor="player-o">
+											Player O Address
+										</label>
 										<Input
-											onChange={(event) => {
-												onChangeOAddress(event);
-											}}
-											style={{ width: "calc(100% - 60px)" }}
+											id="player-o"
+											onChange={onChangeOAddress}
 											placeholder="Player O Address"
-											size="large"
 											defaultValue={OAddress}
 										/>
+									</div>
+									<Button onClick={addNewGame}>Start new game</Button>
+								</CardContent>
+							</Card>
 
-										<Button
-											onClick={addNewGame}
-											type="primary"
-											style={{ height: "40px", backgroundColor: "#3f67ff" }}
-										>
-											Start new game
-										</Button>
-									</Input.Group>
-								</Col>
-							</Row>
-							<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-								<Col flex={"auto"}>
-									<p>
-										<b>How to play:</b>
-										<li>Connect your wallet of choice with the button in the upper left</li>
+							{/* How to play */}
+							<Card>
+								<CardHeader>
+									<CardTitle>How to play</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+										<li>Connect your wallet of choice with the button in the upper right</li>
 										<li>
 											To connect to an existing game, enter a game creator (APT Name or Address)
 											into the game creator field, and the game name into the game name field. Then,
@@ -601,172 +592,90 @@ function App() {
 											refreshed for future updates
 										</li>
 										<li>Future will add listing of games, maybe matchmaking as well</li>
-									</p>
-								</Col>
-							</Row>
+									</ul>
+								</CardContent>
+							</Card>
 						</div>
 					)}
+
 					{accountHasGame && (
-						<div>
-							<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-								<Col flex={"auto"}>
+						<div className="space-y-6">
+							{/* Main menu button */}
+							<Button variant="outline" onClick={() => mainMenu()}>
+								Main Menu
+							</Button>
+
+							{/* Player info card */}
+							<Card>
+								<CardHeader>
+									<CardTitle>
+										{gameCreator} : {gameIdName}
+									</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<div className="grid grid-cols-2 gap-4 text-sm">
+										<div>
+											<span className="font-medium">Player X:</span> {players.playerX}
+										</div>
+										<div>
+											<span className="font-medium">Player O:</span> {players.playerO}
+										</div>
+									</div>
+								</CardContent>
+							</Card>
+
+							{/* Current player / winner alert */}
+							{!gameOver && (
+								<Alert>
+									<AlertDescription>
+										Current player is {currentPlayer.symbol} ({currentPlayer.name})
+									</AlertDescription>
+								</Alert>
+							)}
+							{gameOver && (
+								<Alert variant={winner.alert_type === "error" ? "destructive" : "default"}>
+									<AlertDescription>
+										{winner.symbol === "Draw"
+											? "Game ended in a draw!"
+											: `Winner is ${winner.symbol} (${winner.address})`}
+									</AlertDescription>
+								</Alert>
+							)}
+
+							{/* Board grid */}
+							<div className="grid grid-cols-3 gap-2 w-fit mx-auto">
+								{[0, 1, 2, 3, 4, 5, 6, 7, 8].map((pos) => (
 									<Button
-										onClick={() => mainMenu()}
-										type="primary"
-										style={{ height: "40px", backgroundColor: "#3f67ff" }}
+										key={`cell-${pos}`}
+										variant="outline"
+										className="w-20 h-20 text-2xl font-bold"
+										onClick={() => playSpace(pos)}
+										disabled={gameOver || board[pos].trim() !== ""}
 									>
-										Main Menu
+										{board[pos]}
 									</Button>
-								</Col>
-							</Row>
-							<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-								<Col flex={"auto"}>
-									<Descriptions title={`${gameCreator} : ${gameIdName}`} bordered size="middle">
-										<Descriptions.Item label="Player X" span={8}>
-											{players.playerX}
-										</Descriptions.Item>
-										<Descriptions.Item label="Player O" span={8}>
-											{players.playerO}
-										</Descriptions.Item>
-									</Descriptions>
-								</Col>
-							</Row>
-							<Input.Group>
-								<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-									{!gameOver && (
-										<Col flex={"auto"}>
-											<Alert
-												message={`Current player is ${currentPlayer.symbol} (${currentPlayer.name})`}
-											/>
-										</Col>
+								))}
+							</div>
+
+							{/* Game over actions */}
+							{gameOver && (
+								<div className="flex gap-4 justify-center">
+									<Button onClick={resetGame}>Play again?</Button>
+									{gameIdAddress === account?.address?.toString() && (
+										<Button variant="destructive" onClick={deleteGame}>
+											Delete game (only the game account can)
+										</Button>
 									)}
-									{gameOver && (
-										<Col flex={"auto"}>
-											<Alert
-												message={`Winner is ${winner.symbol} (${winner.address})`}
-												type={winner.alert_type}
-											/>
-										</Col>
-									)}
-								</Row>
-								<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-									<Col flex={1} />
-									<Col flex={"auto"}>
-										<Button
-											onClick={() => playSpace(0)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[0]}
-										</Button>
-										<Button
-											onClick={() => playSpace(1)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[1]}
-										</Button>
-										<Button
-											onClick={() => playSpace(2)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[2]}
-										</Button>
-									</Col>
-								</Row>
-								<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-									<Col flex={1} />
-									<Col flex={"auto"}>
-										<Button
-											onClick={() => playSpace(3)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[3]}
-										</Button>
-										<Button
-											onClick={() => playSpace(4)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[4]}
-										</Button>
-										<Button
-											onClick={() => playSpace(5)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[5]}
-										</Button>
-									</Col>
-								</Row>
-								<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-									<Col flex={1} />
-									<Col flex={"auto"}>
-										<Button
-											onClick={() => playSpace(6)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[6]}
-										</Button>
-										<Button
-											onClick={() => playSpace(7)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[7]}
-										</Button>
-										<Button
-											onClick={() => playSpace(8)}
-											block
-											type="primary"
-											style={{ width: "80px", height: "80px" }}
-										>
-											{board[8]}
-										</Button>
-									</Col>
-								</Row>
-								<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-									{gameOver && (
-										<Col flex={"auto"}>
-											<Button
-												onClick={resetGame}
-												block
-												type="primary"
-												style={{ height: "40px", backgroundColor: "#5f67ff" }}
-											>
-												Play again?
-											</Button>
-										</Col>
-									)}
-									{gameOver && gameIdAddress === account?.address && (
-										<Col flex={"auto"}>
-											<Button
-												onClick={deleteGame}
-												block
-												type="primary"
-												style={{ height: "40px", backgroundColor: "#3f67ff" }}
-											>
-												Delete game (only the game account can)
-											</Button>
-										</Col>
-									)}
-								</Row>
-							</Input.Group>
-							<Row align="middle" gutter={[0, 32]} style={{ marginTop: "2rem" }}>
-								<Col flex={"auto"}>
-									<p>
-										<b>How to play:</b>
+								</div>
+							)}
+
+							{/* How to play */}
+							<Card>
+								<CardHeader>
+									<CardTitle>How to play</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
 										<li>Click the space that you'd like to play</li>
 										<li>Accept the transaction, or cancel and choose a new space</li>
 										<li>
@@ -783,14 +692,14 @@ function App() {
 											If you're the creator of the game, you can delete the game entirely with
 											"Delete game"
 										</li>
-									</p>
-								</Col>
-							</Row>
+									</ul>
+								</CardContent>
+							</Card>
 						</div>
 					)}
-				</Spin>
+				</main>
 			)}
-		</>
+		</div>
 	);
 }
 
