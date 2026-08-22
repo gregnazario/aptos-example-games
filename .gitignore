@@ -78,6 +78,11 @@ typings/
 # Next.js build output
 .next
 
+# TanStack Start / Nitro
+.output/
+.nitro/
+.tanstack/
+
 # Nuxt.js build / generate output
 .nuxt
 dist

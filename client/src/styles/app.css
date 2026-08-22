@@ -1,0 +1,90 @@
+@import "tailwindcss" source("../");
+@import "tw-animate-css";
+
+@theme inline {
+  --font-display: "Fraunces", "Times New Roman", serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-mark-x: var(--mark-x);
+  --color-mark-o: var(--mark-o);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
+:root {
+  color-scheme: dark;
+  --radius: 0.9rem;
+  --background: #08110f;
+  --foreground: #e8f4ee;
+  --card: #101a17cc;
+  --card-foreground: #e8f4ee;
+  --popover: #121c19;
+  --popover-foreground: #e8f4ee;
+  --primary: #3ee0b0;
+  --primary-foreground: #06211a;
+  --secondary: #1a2924;
+  --secondary-foreground: #d7ece3;
+  --muted: #17221f;
+  --muted-foreground: #93b0a6;
+  --accent: #1e332c;
+  --accent-foreground: #d7ece3;
+  --destructive: #ff6b6b;
+  --border: #2a4038;
+  --input: #24352f;
+  --ring: #3ee0b0;
+  --mark-x: #f3b45c;
+  --mark-o: #7ec8ff;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    @apply min-h-full bg-background font-sans text-foreground antialiased;
+  }
+
+  body {
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, #14362c 0%, transparent 55%),
+      radial-gradient(900px 500px at 110% 10%, #1a2a48 0%, transparent 50%),
+      linear-gradient(#08110f, #08110f);
+    background-attachment: fixed;
+  }
+
+  body::before {
+    content: "";
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    background-image: linear-gradient(
+        to right,
+        rgb(62 224 176 / 0.045) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgb(62 224 176 / 0.045) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+}
