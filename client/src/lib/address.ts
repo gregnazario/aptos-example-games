@@ -11,7 +11,7 @@ export function asAddressString(value: unknown): string {
 
 export function parseAccountAddress(value: string): string | null {
   try {
-    return AccountAddress.from(value).toString();
+    return AccountAddress.from(value, { maxMissingChars: 63 }).toString();
   } catch {
     return null;
   }
@@ -25,7 +25,9 @@ export function errorMessage(error: unknown): string {
 export function addressesEqual(left?: string | null, right?: string | null): boolean {
   if (!left || !right) return false;
   try {
-    return AccountAddress.from(left).equals(AccountAddress.from(right));
+    return AccountAddress.from(left, { maxMissingChars: 63 }).equals(
+      AccountAddress.from(right, { maxMissingChars: 63 }),
+    );
   } catch {
     return left.toLowerCase() === right.toLowerCase();
   }

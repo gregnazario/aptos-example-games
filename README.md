@@ -31,6 +31,17 @@ npm start
 If you republish the contract, update `MODULE_ADDRESS` in
 `client/src/lib/constants.ts`.
 
+## Tests and CI
+
+```
+cd client
+npm test
+npm run typecheck
+npm run build && npm run test:ssr
+```
+
+Pull requests run the same checks on GitHub Actions (Node 22), plus `aptos move compile` for the tic-tac-toe package.
+
 ## How to play (without a UI and just the CLI)
 
 ### Setup
