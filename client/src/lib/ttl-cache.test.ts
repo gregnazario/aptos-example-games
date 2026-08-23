@@ -32,12 +32,36 @@ describe("TtlCache", () => {
     expect(cache.get("alice")).toBe("new");
   });
 
-  test("clear drops every key", () => {
-    const cache = new TtlCache<string>(1_000);
+  test("evicts the least recently used key when over maxSize", () => {
+    const cache = new TtlCache<string>(60_000, { maxSize: 2 });
     cache.set("a", "1");
     cache.set("b", "2");
-    cache.clear();
+    cache.set("c", "3");
     expect(cache.get("a")).toBeNull();
+    expect(cache.get("b")).toBe("2");
+    expect(cache.get("c")).toBe("3");
+  });
+
+  test("get refreshes LRU order", () => {
+    const cache = new TtlCache<string>(60_000, { maxSize: 2 });
+    cache.set("a", "1");
+    cache.set("b", "2");
+    expect(cache.get("a")).toBe("1");
+    cache.set("c", "3");
     expect(cache.get("b")).toBeNull();
+    expect(cache.get("a")).toBe("1");
+    expect(cache.get("c")).toBe("3");
+  });
+
+  test("set sweeps expired keys before inserting", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const cache = new TtlCache<string>(1_000, { maxSize: 2 });
+    cache.set("old", "1");
+    vi.setSystemTime(new Date("2026-01-01T00:00:01.001Z"));
+    cache.set("new", "2");
+    expect(cache.size).toBe(1);
+    expect(cache.get("old")).toBeNull();
+    expect(cache.get("new")).toBe("2");
   });
 });

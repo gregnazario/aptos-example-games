@@ -83,6 +83,7 @@ function JoinCard() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!creator.trim() || !name.trim()) return;
     setError("");
     setPending(true);
     try {
@@ -132,7 +133,10 @@ function JoinCard() {
             onChange={setName}
             placeholder="default"
           />
-          <Button type="submit" disabled={pending || !creator.trim()}>
+          <Button
+            type="submit"
+            disabled={pending || !creator.trim() || !name.trim()}
+          >
             {pending ? "Opening…" : "Join game"}
           </Button>
         </form>
@@ -167,6 +171,7 @@ function CreateCard() {
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!account) return;
+    if (!gameName.trim() || !playerX.trim() || !playerO.trim()) return;
     setError("");
     setPending(true);
     try {
@@ -261,6 +266,7 @@ function CreateCard() {
               pending ||
               !connected ||
               wrongNetwork ||
+              !gameName.trim() ||
               !playerX.trim() ||
               !playerO.trim()
             }

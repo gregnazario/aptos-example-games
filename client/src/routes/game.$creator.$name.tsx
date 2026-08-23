@@ -267,6 +267,8 @@ function InteractiveBoard({
   const isCreator = addressesEqual(accountAddress, game.creatorAddress);
   const gameOver = !!game.winner;
 
+  const canSubmit = connected && !wrongNetwork && !pending;
+
   const run = async (fn: () => Promise<void>) => {
     setError("");
     setPending(true);
@@ -351,7 +353,7 @@ function InteractiveBoard({
         <div className="flex flex-wrap justify-center gap-3">
           <Button
             onClick={resetGame}
-            disabled={!connected || wrongNetwork || pending}
+            disabled={!canSubmit}
           >
             Play again
           </Button>
@@ -359,7 +361,7 @@ function InteractiveBoard({
             <Button
               variant="destructive"
               onClick={deleteGame}
-              disabled={pending}
+              disabled={!canSubmit}
             >
               Delete game
             </Button>

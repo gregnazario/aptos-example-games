@@ -69,7 +69,7 @@ export async function resolveToName(
       return display;
     }
   } catch {
-    // Fall through to the original identifier.
+    return maybeAddress;
   }
 
   deps.nameCache.set(maybeAddress, maybeAddress);

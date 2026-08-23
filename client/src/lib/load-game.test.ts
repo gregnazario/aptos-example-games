@@ -71,6 +71,17 @@ describe("resolveToAddress", () => {
     expect(deps.getOwnerAddress).toHaveBeenCalledWith({ name: "alice.apt" });
   });
 
+  test("sends unprefixed hex names to ANS instead of padding them", async () => {
+    const deps = baseDeps({
+      getOwnerAddress: vi.fn(async ({ name }) => {
+        if (name === "cafe.apt") return CREATOR;
+        return null;
+      }),
+    });
+    await expect(resolveToAddress("cafe", deps)).resolves.toBe(CREATOR);
+    expect(deps.getOwnerAddress).toHaveBeenCalledWith({ name: "cafe.apt" });
+  });
+
   test("throws when the name cannot be resolved", async () => {
     const deps = baseDeps();
     await expect(resolveToAddress("nobody", deps)).rejects.toThrow(
@@ -96,6 +107,17 @@ describe("resolveToName", () => {
       }),
     });
     await expect(resolveToName(CREATOR, deps)).resolves.toBe(CREATOR);
+  });
+
+  test("does not cache an ANS outage as a missing name", async () => {
+    const getPrimaryName = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("indexer down"))
+      .mockResolvedValueOnce("alice");
+    const deps = baseDeps({ getPrimaryName });
+    await expect(resolveToName(CREATOR, deps)).resolves.toBe(CREATOR);
+    await expect(resolveToName(CREATOR, deps)).resolves.toBe("alice.apt");
+    expect(getPrimaryName).toHaveBeenCalledTimes(2);
   });
 });
 

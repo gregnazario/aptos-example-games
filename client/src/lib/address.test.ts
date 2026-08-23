@@ -23,10 +23,22 @@ describe("parseAccountAddress", () => {
     expect(parsed?.startsWith("0x")).toBe(true);
   });
 
-  test("pads short non-special hex addresses", () => {
+  test("pads short 0x-prefixed addresses", () => {
     const parsed = parseAccountAddress("0xaa");
     expect(parsed).toBe(
       AccountAddress.from(`0x${"aa".padStart(64, "0")}`).toString(),
+    );
+  });
+
+  test("does not treat unprefixed hex as an address (ANS names like cafe)", () => {
+    expect(parseAccountAddress("cafe")).toBeNull();
+    expect(parseAccountAddress("dead")).toBeNull();
+  });
+
+  test("accepts a LONG hex string without 0x", () => {
+    const long = "aa".repeat(32);
+    expect(parseAccountAddress(long)).toBe(
+      AccountAddress.from(`0x${long}`).toString(),
     );
   });
 
