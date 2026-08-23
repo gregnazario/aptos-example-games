@@ -7,10 +7,12 @@
 
 [build]
   command = "npm run build"
-  publish = ".output/public"
+  # Nitro's netlify preset writes static assets (and _redirects) to dist/, not .output/public.
+  publish = "dist"
 
 [build.environment]
   NITRO_PRESET = "netlify"
+  NODE_VERSION = "22"
 
 [dev]
   command = "npm start"

@@ -1,5 +1,4 @@
 import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
-import { Network } from "@aptos-labs/ts-sdk";
 import {
   createContext,
   useContext,
@@ -7,13 +6,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { APTOS_NETWORK } from "@/lib/constants";
 
 const WalletMountedContext = createContext(false);
 
-export function useWalletMounted() {
+function useWalletMounted() {
   return useContext(WalletMountedContext);
 }
 
+/**
+ * AptosWalletAdapterProvider is client-only (wallets/localStorage).
+ * Anything that calls `useWallet()` must render inside `<WalletClient>`.
+ */
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
@@ -32,7 +36,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   return (
     <AptosWalletAdapterProvider
       autoConnect
-      dappConfig={{ network: Network.DEVNET }}
+      dappConfig={{ network: APTOS_NETWORK }}
       optInWallets={["Petra"]}
       onError={(error) => {
         console.error("Wallet adapter error", error);
@@ -41,4 +45,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       {tree}
     </AptosWalletAdapterProvider>
   );
+}
+
+export function WalletClient({
+  children,
+  fallback = null,
+}: {
+  children: ReactNode;
+  fallback?: ReactNode;
+}) {
+  const mounted = useWalletMounted();
+  return mounted ? children : fallback;
 }

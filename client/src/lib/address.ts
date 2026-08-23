@@ -9,6 +9,19 @@ export function asAddressString(value: unknown): string {
   return String(value);
 }
 
+export function parseAccountAddress(value: string): string | null {
+  try {
+    return AccountAddress.from(value).toString();
+  } catch {
+    return null;
+  }
+}
+
+export function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error);
+}
+
 export function addressesEqual(left?: string | null, right?: string | null): boolean {
   if (!left || !right) return false;
   try {

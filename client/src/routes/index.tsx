@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { type FormEvent, useState } from "react";
 import { HowToPlay } from "@/components/HowToPlay";
-import { useWalletMounted } from "@/components/WalletProvider";
+import { WalletClient } from "@/components/WalletProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,8 +48,6 @@ function Field({
 }
 
 function LobbyPage() {
-  const mounted = useWalletMounted();
-
   return (
     <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
       <section className="space-y-4 pt-2">
@@ -67,7 +65,9 @@ function LobbyPage() {
 
       <div className="space-y-6">
         <JoinCard />
-        {mounted ? <CreateCard /> : <CreatePlaceholder />}
+        <WalletClient fallback={<CreatePlaceholder />}>
+          <CreateCard />
+        </WalletClient>
         <HowToPlay variant="lobby" />
       </div>
     </div>

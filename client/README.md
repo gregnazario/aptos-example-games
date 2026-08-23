@@ -18,3 +18,6 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Game reads go through a Start server function (`src/functions/game.ts`). Moves
 are signed in the browser with the Aptos wallet adapter.
+
+Netlify deploys with `NITRO_PRESET=netlify` (publish directory `dist`, Node 22).
+Local production preview still uses `npm run start:prod` against `.output/`.

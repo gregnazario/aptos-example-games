@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { GameBoard } from "@/components/GameBoard";
 import { HowToPlay } from "@/components/HowToPlay";
-import { useWalletMounted } from "@/components/WalletProvider";
+import { WalletClient } from "@/components/WalletProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -32,24 +32,44 @@ function GamePending() {
 }
 
 function GamePage() {
-  const game = Route.useLoaderData();
+  const result = Route.useLoaderData();
   const router = useRouter();
+  const params = Route.useParams();
+  const txPendingRef = useRef(false);
+  const routeKey = `${params.creator}/${params.name}`;
+  const [cached, setCached] = useState<{ key: string; game: GameState } | null>(
+    null,
+  );
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
+    if (result.found) setCached({ key: routeKey, game: result });
+  }, [result, routeKey]);
+
+  useEffect(() => {
+    const poll = () => {
+      if (document.visibilityState !== "visible") return;
+      if (txPendingRef.current) return;
       void router.invalidate();
-    }, 8000);
-    return () => window.clearInterval(timer);
+    };
+    const timer = window.setInterval(poll, 8000);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", poll);
+    };
   }, [router]);
 
-  if (!game.found) {
+  const lastGame = cached?.key === routeKey ? cached.game : null;
+
+  if (!result.found && result.reason === "missing") {
     return (
       <Card className="mt-6">
         <CardTitle>Game not found</CardTitle>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            No board named <span className="text-foreground">{game.name}</span>{" "}
-            exists at {game.creator}.
+            No board named{" "}
+            <span className="text-foreground">{result.name || params.name}</span>{" "}
+            exists at {result.creator || params.creator}.
           </p>
           <Button asChild className="mt-2 w-fit">
             <Link to="/">Back to lobby</Link>
@@ -59,12 +79,51 @@ function GamePage() {
     );
   }
 
-  return <LiveGame game={game} />;
+  if (!result.found && result.reason === "error" && !lastGame) {
+    return (
+      <Card className="mt-6">
+        <CardTitle>Couldn’t load this board</CardTitle>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{result.message}</p>
+          <Button
+            className="mt-2 w-fit"
+            type="button"
+            onClick={() => {
+              void router.invalidate();
+            }}
+          >
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const game = result.found ? result : lastGame;
+  if (!game) return null;
+
+  return (
+    <div className="space-y-4">
+      {!result.found ? (
+        <Alert variant="warning">
+          <AlertDescription>
+            Couldn’t refresh the board ({result.message}). Showing the last
+            known position.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <LiveGame game={game} txPendingRef={txPendingRef} />
+    </div>
+  );
 }
 
-function LiveGame({ game }: { game: GameState }) {
-  const mounted = useWalletMounted();
-
+function LiveGame({
+  game,
+  txPendingRef,
+}: {
+  game: GameState;
+  txPendingRef: MutableRefObject<boolean>;
+}) {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -102,11 +161,11 @@ function LiveGame({ game }: { game: GameState }) {
         <StatusBanner game={game} />
       </div>
 
-      {mounted ? (
-        <InteractiveBoard game={game} />
-      ) : (
-        <GameBoard board={game.board} disabled onPlay={() => {}} />
-      )}
+      <WalletClient
+        fallback={<GameBoard board={game.board} disabled onPlay={() => {}} />}
+      >
+        <InteractiveBoard game={game} txPendingRef={txPendingRef} />
+      </WalletClient>
 
       <HowToPlay variant="game" />
     </div>
@@ -179,11 +238,24 @@ function StatusBanner({ game }: { game: GameState }) {
   );
 }
 
-function InteractiveBoard({ game }: { game: GameState }) {
+function InteractiveBoard({
+  game,
+  txPendingRef,
+}: {
+  game: GameState;
+  txPendingRef: MutableRefObject<boolean>;
+}) {
   const { account, connected, network, signAndSubmitTransaction } = useWallet();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    txPendingRef.current = pending;
+    return () => {
+      txPendingRef.current = false;
+    };
+  }, [pending, txPendingRef]);
 
   const networkName = network?.name ? String(network.name).toLowerCase() : "";
   const wrongNetwork = connected && networkName !== NETWORK;

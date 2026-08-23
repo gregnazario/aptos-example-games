@@ -10,7 +10,11 @@
     "serve": "vite preview",
     "preview": "vite preview",
     "start:prod": "node .output/server/index.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/run-parse-board-test.mjs"
+  },
+  "engines": {
+    "node": ">=22.12"
   },
   "dependencies": {
     "@aptos-labs/ts-sdk": "^6.0.0",

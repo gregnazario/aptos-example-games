@@ -27,11 +27,20 @@ export type GameState = {
 
 export type MissingGame = {
   found: false;
+  reason: "missing";
   creator: string;
   name: string;
 };
 
-export type GameStateResult = GameState | MissingGame;
+export type GameLookupError = {
+  found: false;
+  reason: "error";
+  creator: string;
+  name: string;
+  message: string;
+};
+
+export type GameStateResult = GameState | MissingGame | GameLookupError;
 
 const WIN_LINES = [
   [0, 1, 2],
@@ -50,15 +59,26 @@ export function markFromNum(value: number): Mark {
   return "";
 }
 
+function bytesFromUnknown(raw: unknown): number[] | null {
+  if (raw instanceof ArrayBuffer) {
+    return Array.from(new Uint8Array(raw));
+  }
+  if (ArrayBuffer.isView(raw)) {
+    return Array.from(
+      new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength),
+    );
+  }
+  if (Array.isArray(raw)) {
+    return raw.map(Number);
+  }
+  if (raw && typeof raw === "object" && Symbol.iterator in raw) {
+    return Array.from(raw as Iterable<unknown>, Number);
+  }
+  return null;
+}
+
 export function parseBoard(raw: unknown): Mark[] {
   const cells: Mark[] = Array.from({ length: 9 }, () => "");
-
-  if (Array.isArray(raw)) {
-    for (let i = 0; i < 9 && i < raw.length; i++) {
-      cells[i] = markFromNum(Number(raw[i]));
-    }
-    return cells;
-  }
 
   if (typeof raw === "string") {
     const hex = raw.startsWith("0x") ? raw.slice(2) : raw;
@@ -67,8 +87,14 @@ export function parseBoard(raw: unknown): Mark[] {
       if (!pair) break;
       cells[i] = markFromNum(Number.parseInt(pair, 16));
     }
+    return cells;
   }
 
+  const bytes = bytesFromUnknown(raw);
+  if (!bytes) return cells;
+  for (let i = 0; i < 9 && i < bytes.length; i++) {
+    cells[i] = markFromNum(Number(bytes[i]));
+  }
   return cells;
 }
 
