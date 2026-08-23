@@ -2,52 +2,53 @@
   "name": "client",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "start": "vite dev",
+    "build": "vite build",
+    "serve": "vite preview",
+    "preview": "vite preview",
+    "start:prod": "node .output/server/index.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ssr": "node scripts/ssr-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
   "dependencies": {
-    "@aptos-labs/ts-sdk": "^1.10.0",
-    "@aptos-labs/wallet-adapter-ant-design": "^2.0.0",
-    "@aptos-labs/wallet-adapter-core": "^3.6.0",
-    "@aptos-labs/wallet-adapter-react": "^2.1.8",
-    "antd": "^5.15.3",
-    "aptos": "^1.21.0",
-    "buffer": "^6.0.3",
-    "history": "^5.3.0",
-    "petra-plugin-wallet-adapter": "^0.4.4",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router": "^6.22.3",
-    "typescript": "^5.4.3"
+    "@aptos-labs/ts-sdk": "^6.0.0",
+    "@aptos-labs/wallet-adapter-react": "^8.3.0",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@tanstack/react-router": "^1.168.0",
+    "@tanstack/react-start": "^1.168.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.30",
-    "@types/react": "^18.2.69",
-    "@types/react-dom": "^18.2.22",
-    "@babel/core": "^7.22.10",
-    "@babel/plugin-syntax-flow": "^7.22.5",
-    "@babel/plugin-transform-react-jsx": "^7.22.5",
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "vite": "^5.2.6",
-    "@vitejs/plugin-react": "^4.2.1"
-  },
-  "scripts": {
-    "start": "vite",
-    "build": "vite build",
-    "serve": "vite preview"
-  },
-  "eslintConfig": {
-    "extends": [
-      "vite"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "@tailwindcss/vite": "^4.2.0",
+    "@tanstack/react-router-devtools": "^1.167.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "jsdom": "^29.1.1",
+    "nitro": "3.0.260610-beta",
+    "tailwindcss": "^4.2.0",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5.8.0",
+    "vite": "^7.1.0",
+    "vitest": "^4.1.11"
   }
 }
