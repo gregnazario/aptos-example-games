@@ -1,10 +1,13 @@
 [package]
 name = 'ExampleTicTacToe'
 version = '0.2.0'
+
+# Compile against the deployed framework, not aptos-core `main`.
+# `main` can include unreleased spec syntax that released CLIs reject.
 [dependencies.AptosFramework]
-git = 'https://github.com/aptos-labs/aptos-core.git'
-rev = 'mainnet'
-subdir = 'aptos-move/framework/aptos-framework'
+git = "https://github.com/aptos-labs/aptos-framework.git"
+rev = "mainnet"
+subdir = "aptos-framework"
 
 [addresses]
 deploy_account = "_"
