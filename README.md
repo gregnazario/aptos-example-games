@@ -10,7 +10,7 @@ Live site: https://tic-tac-toe.gnazar.io
 
 ## How to publish game Move code
 
-You can publish this with the aptos CLI (please version 1.0.6 or newer). These
+You can publish this with the aptos CLI (CI uses 9.5.0). These
 instructions are for devnet, but you can simply use a testnet / mainnet account
 instead.
 
@@ -40,7 +40,7 @@ npm run typecheck
 npm run build && npm run test:ssr
 ```
 
-Pull requests run the same checks on GitHub Actions (Node 22), plus `aptos move compile` for the tic-tac-toe package.
+Pull requests run the same checks on GitHub Actions (Node 22), plus `aptos move compile` for the tic-tac-toe and checkers packages against Aptos CLI 9.5.0 and the `mainnet` framework.
 
 ## How to play (without a UI and just the CLI)
 

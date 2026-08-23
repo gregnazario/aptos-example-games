@@ -47,10 +47,16 @@ jobs:
         with:
           node-version: "22"
       - name: Install Aptos CLI
+        env:
+          APTOS_CLI_VERSION: "9.5.0"
         run: |
-          npm install --global @aptos-labs/aptos-cli
-          npx --yes aptos --install
+          npm install --global @aptos-labs/aptos-cli@3.0.0
+          npx --yes @aptos-labs/aptos-cli@3.0.0 --install
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/aptos" --version
       - name: Compile tic-tac-toe
         working-directory: move
+        run: aptos move compile --named-addresses deploy_account=0xA11CE
+      - name: Compile checkers
+        working-directory: move/checkers
         run: aptos move compile --named-addresses deploy_account=0xA11CE
