@@ -4,6 +4,8 @@ module arcade::hub {
     use aptos_framework::object;
     use aptos_framework::simple_map::{Self, SimpleMap};
 
+    friend arcade::wager;
+
     /// Hub singleton not initialized yet
     const E_NOT_INITIALIZED: u64 = 1;
     /// Game not present in the list being removed, or already listed
