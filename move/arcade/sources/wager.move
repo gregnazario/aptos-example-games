@@ -180,6 +180,73 @@ module arcade::wager {
         (g.player_a, g.player_b)
     }
 
+    /// Called by game modules from their join entry function.
+    public(friend) fun join_core(player: &signer, game_addr: address) acquires Game {
+        let player_addr = signer::address_of(player);
+        {
+            let game = borrow_global_mut<Game>(game_addr);
+            assert!(game.phase == PHASE_OPEN, E_WRONG_PHASE);
+            assert!(player_addr != game.player_a, E_NOT_ALLOWED);
+            game.player_b = player_addr;
+            game.phase = PHASE_IN_PROGRESS;
+            game.last_move_at = timestamp::now_seconds();
+            let kind = game.kind;
+            let stake = game.stake;
+            transfer_in(player, game_addr, stake);
+            hub::unlist(kind, game_addr);
+        };
+        emit(game_addr, ACTION_JOINED, player_addr, 0);
+    }
+
+    /// Pays the whole pot to `winner` and closes the game. Friend-only.
+    public(friend) fun settle(game_addr: address, winner: address) acquires Game {
+        {
+            let game = borrow_global_mut<Game>(game_addr);
+            assert!(game.phase == PHASE_IN_PROGRESS, E_WRONG_PHASE);
+            assert!(winner == game.player_a || winner == game.player_b, E_NOT_ALLOWED);
+            game.phase = PHASE_SETTLED;
+        };
+        let balance = pot_balance(game_addr);
+        pay_out(game_addr, winner, balance);
+        emit(game_addr, ACTION_SETTLED, winner, balance);
+    }
+
+    /// Splits the pot; both players get their stake back.
+    public(friend) fun settle_draw(game_addr: address) acquires Game {
+        {
+            let game = borrow_global_mut<Game>(game_addr);
+            assert!(game.phase == PHASE_IN_PROGRESS, E_WRONG_PHASE);
+            game.phase = PHASE_SETTLED;
+        };
+        let (a, b, stake) = {
+            let game = borrow_global<Game>(game_addr);
+            (game.player_a, game.player_b, game.stake)
+        };
+        pay_out(game_addr, a, stake);
+        pay_out(game_addr, b, pot_balance(game_addr)); // remainder incl. any dust
+        emit(game_addr, ACTION_SETTLED, a, 2 * stake);
+    }
+
+    /// Games call this on every accepted move.
+    public(friend) fun touch(game_addr: address) acquires Game {
+        borrow_global_mut<Game>(game_addr).last_move_at = timestamp::now_seconds();
+    }
+
+    /// Seconds after `last_move_at` without a move before forfeit can be claimed.
+    public fun timeout_seconds(): u64 {
+        259_200
+    }
+
+    #[view]
+    public fun last_move_at(game_addr: address): u64 {
+        borrow_global<Game>(game_addr).last_move_at
+    }
+
+    #[view]
+    public fun time_since_last_move(game_addr: address): u64 {
+        timestamp::now_seconds() - borrow_global<Game>(game_addr).last_move_at
+    }
+
     // ------------------------------------------------------------------
     // Test section (Task 3): create / cancel / escrow
     // ------------------------------------------------------------------
@@ -247,5 +314,118 @@ module arcade::wager {
         hub::initialize(deployer);
         let ctor = create_game(creator, 1, 0, string::utf8(b"x"));
         let _ = ctor;
+    }
+
+    // ------------------------------------------------------------------
+    // Task 4: join + settlement
+    // ------------------------------------------------------------------
+
+    #[test(creator = @0x4444, opponent = @0x5555, deployer = @arcade)]
+    fun test_join_funds_pot_and_starts_game(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0x4444, 10_000_000);
+        setup_coin_and_player(@0x5555, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 2, 250, string::utf8(b"j"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0x4444, b"j");
+        assert!(vector::length(&hub::open_games(2)) == 1);
+
+        join_core(opponent, game_addr);
+        assert!(phase(game_addr) == 1);
+        assert!(pot(game_addr) == 500);
+        let (a, b) = players(game_addr);
+        assert!(a == @0x4444 && b == @0x5555);
+        assert!(apt_balance(@0x5555) == 10_000_000 - 250);
+        assert!(vector::length(&hub::open_games(2)) == 0);
+    }
+
+    #[test(creator = @0x6666, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_NOT_ALLOWED)]
+    fun test_join_rejects_creator_as_opponent(creator: &signer, deployer: &signer) acquires Game {
+        setup_coin_and_player(@0x6666, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"t"));
+        let _ = ctor;
+        join_core(creator, last_game_address(@0x6666, b"t"));
+    }
+
+    #[test(creator = @0x7777, opponent = @0x8888, deployer = @arcade)]
+    fun test_settle_pays_winner_whole_pot(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0x7777, 10_000_000);
+        setup_coin_and_player(@0x8888, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 3, 300, string::utf8(b"s"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0x7777, b"s");
+        join_core(opponent, game_addr);
+        settle(game_addr, @0x8888);
+        assert!(phase(game_addr) == 2);
+        assert!(pot(game_addr) == 0);
+        assert!(apt_balance(@0x8888) == 10_000_000 - 300 + 600);
+        assert!(apt_balance(@0x7777) == 10_000_000 - 300);
+    }
+
+    #[test(creator = @0x9999, opponent = @0xAAAA, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_WRONG_PHASE)]
+    fun test_settle_is_one_shot(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0x9999, 10_000_000);
+        setup_coin_and_player(@0xAAAA, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"d"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0x9999, b"d");
+        join_core(opponent, game_addr);
+        settle(game_addr, @0x9999);
+        settle(game_addr, @0x9999);
+    }
+
+    #[test(creator = @0xB1, opponent = @0xB2, deployer = @arcade)]
+    fun test_settle_draw_refunds_both(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0xB1, 10_000_000);
+        setup_coin_and_player(@0xB2, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"e"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xB1, b"e");
+        join_core(opponent, game_addr);
+        settle_draw(game_addr);
+        assert!(phase(game_addr) == 2);
+        assert!(pot(game_addr) == 0);
+        assert!(apt_balance(@0xB1) == 10_000_000);
+        assert!(apt_balance(@0xB2) == 10_000_000);
+    }
+
+    #[test(creator = @0xC3, opponent = @0xC4, deployer = @arcade)]
+    fun test_touch_updates_last_move_at(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0xC3, 10_000_000);
+        setup_coin_and_player(@0xC4, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"m"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xC3, b"m");
+        join_core(opponent, game_addr);
+        aptos_framework::timestamp::fast_forward_seconds(60);
+        touch(game_addr);
+        assert!(last_move_at(game_addr) >= 60);
     }
 }
