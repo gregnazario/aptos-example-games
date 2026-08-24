@@ -428,4 +428,79 @@ module arcade::wager {
         touch(game_addr);
         assert!(last_move_at(game_addr) >= 60);
     }
+
+    // ------------------------------------------------------------------
+    // Task 5: fund invariants I1-I4
+    // ------------------------------------------------------------------
+
+    #[test(creator = @0xD1, opponent = @0xD2, deployer = @arcade)]
+    fun test_i1_pot_always_covers_settlement(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        // After join the pot is exactly 2*stake and settle pays exactly that.
+        setup_coin_and_player(@0xD1, 10_000_000);
+        setup_coin_and_player(@0xD2, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"i1"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xD1, b"i1");
+        join_core(opponent, game_addr);
+        assert!(pot(game_addr) == 200);
+        settle(game_addr, @0xD1);
+        assert!(pot(game_addr) == 0);
+        assert!(apt_balance(@0xD1) == 10_000_000 + 100);
+        assert!(apt_balance(@0xD2) == 10_000_000 - 100);
+    }
+
+    #[test(creator = @0xD3, other = @0xD4, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_NOT_ALLOWED)]
+    fun test_i2_cancel_rejects_non_creator(
+        creator: &signer,
+        other: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0xD3, 10_000_000);
+        setup_coin_and_player(@0xD4, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"i2"));
+        let _ = ctor;
+        cancel(other, last_game_address(@0xD3, b"i2"));
+    }
+
+    #[test(creator = @0xD5, opponent = @0xD6, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_WRONG_PHASE)]
+    fun test_i4_cancel_rejected_after_join(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        // Joined games must end via settle/forfeit, never via the refund path.
+        setup_coin_and_player(@0xD5, 10_000_000);
+        setup_coin_and_player(@0xD6, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"i4"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xD5, b"i4");
+        join_core(opponent, game_addr);
+        cancel(creator, game_addr);
+    }
+
+    #[test(creator = @0xD7, opponent = @0xD8, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_NOT_ALLOWED)]
+    fun test_settle_rejects_outside_winner(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0xD7, 10_000_000);
+        setup_coin_and_player(@0xD8, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"sw"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xD7, b"sw");
+        join_core(opponent, game_addr);
+        settle(game_addr, @0xDA);
+    }
 }
