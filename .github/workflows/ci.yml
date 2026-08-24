@@ -67,6 +67,7 @@ jobs:
   cloudflare:
     name: Cloudflare
     runs-on: ubuntu-latest
+    needs: [client, move]
     defaults:
       run:
         working-directory: client

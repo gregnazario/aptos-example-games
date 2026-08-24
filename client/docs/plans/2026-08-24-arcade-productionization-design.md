@@ -68,8 +68,9 @@ struct Game has key {
 }
 ```
 
-- The object owns a `FungibleStore` (primary store) for APT via `primary_fungible_store::create_primary_store_enabled_fungible_store` — this store is the pot. Players deposit by transferring APT into the store; only `wager` code initiates withdrawals.
-- Transfer disabled on game objects (`transfer_ref.disable`), so games can't drift from their escrow.
+- The game object hosts an APT `FungibleStore` (via `fungible_asset::create_store` on its ConstructorRef) — this store is the pot. Players deposit by transferring APT into the store; only `wager` code initiates withdrawals.
+- Immediately after creation the game object is made **self-owned** (`generate_linear_transfer_ref().transfer_with_ref(self)`) with ungated transfers disabled. Because the store lives on the object, whoever owns the object could otherwise withdraw the pot with plain `fungible_asset` calls; self-ownership means no account can ever sign as owner — only the object's own extend-signer (held inside `Game`, reachable only via `wager`) passes the withdraw permission check. Pinned by `test_creator_cannot_drain_pot`.
+- Named objects are not deletable by framework design (`create_named_object` yields `can_delete: false`), so cancelled/settled games persist with an empty pot rather than being burned; deterministic game addresses were chosen over burnability.
 - Every mutation emits an event handle entry: `GameCreated`, `PlayerJoined`, `MovePlayed`, `DiceRolled`, `CubeDoubled`, `CubeAction`, `GameSettled`, `GameForfeited`, `GameCancelled`.
 
 ### Wager semantics (the audited core)
@@ -78,7 +79,7 @@ Fixed APT stake chosen by the creator. All-or-nothing flows:
 
 1. **create(stake)**: mints game object; creator immediately stakes `stake` (pot = 1×). Game listed in hub lobby.
 2. **join**: opponent transfers exactly `stake` into the store (enforced by post-transfer balance check in the same function). Pot = 2×. Game moves to InProgress and unassigned randomness (if any) resolves.
-3. **cancel**: creator-only, only while phase == Open; refunds pot to creator, delists game, burns object. Nobody else can be harmed because no one else has funds at risk while Open.
+3. **cancel**: creator-only, only while phase == Open; refunds pot to creator and delists the game. Nobody else can be harmed because no one else has funds at risk while Open.
 4. **settle(winner)**: `public(friend)` — game modules call it only from a provably terminal state. Pays the entire pot to the winner. Draw variant splits 50/50. Emits `GameSettled`, marks Settled. Repeated settle impossible (phase gate + one-shot flag).
 5. **forfeit_timeout**: any player may call after `now > last_move_at + TIMEOUT` while InProgress; the game module supplies whose turn it was (only that module can know) and calls `wager::settle` with the non-mover as loser. TIMEOUT = 3 days.
 6. **Backgammon cube**: `double` (offer) requires the doubler to escrow `(cube_new − cube_old) × stake` in the same transaction. `accept` requires the acceptor to escrow their matching increment. Pot always equals `2 × stake × cube` once the cube action resolves. On `decline`, the doubler wins at the **old** cube value; the pot is over-funded at that moment and `settle` refunds the excess (invariant I1).

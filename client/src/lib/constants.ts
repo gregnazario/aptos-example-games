@@ -1,10 +1,14 @@
 import { Network } from "@aptos-labs/ts-sdk";
 
-// Env-driven so dev deploys can target devnet while production targets testnet/mainnet.
-export const NETWORK = (import.meta.env.VITE_NETWORK ?? "testnet") as
-  | "devnet"
-  | "testnet"
-  | "mainnet";
+// Env-driven network selection. Defaults to devnet so the legacy tic-tac-toe
+// module keeps working on deploys that set no env; arcade deployments set
+// VITE_NETWORK=testnet explicitly.
+const RAW_NETWORK = import.meta.env.VITE_NETWORK ?? "devnet";
+export const NETWORK = (["devnet", "testnet", "mainnet"] as const).includes(
+  RAW_NETWORK as "devnet" | "testnet" | "mainnet",
+)
+  ? (RAW_NETWORK as "devnet" | "testnet" | "mainnet")
+  : "devnet";
 
 export const APTOS_NETWORKS = {
   devnet: Network.DEVNET,

@@ -16,6 +16,13 @@ module arcade::wager {
     const PHASE_IN_PROGRESS: u8 = 1;
     const PHASE_SETTLED: u8 = 2;
 
+    public const KIND_TIC_TAC_TOE: u8 = 1;
+    public const KIND_CHECKERS: u8 = 2;
+    public const KIND_BACKGAMMON: u8 = 3;
+
+    /// Maximum display-name length; the name doubles as the object seed.
+    const METADATA_MAX_LENGTH: u64 = 64;
+
     /// Stake must be greater than zero
     const E_ZERO_STAKE: u64 = 1;
     /// Game resource not found at address
@@ -24,6 +31,10 @@ module arcade::wager {
     const E_NOT_ALLOWED: u64 = 3;
     /// Game is not in the required phase
     const E_WRONG_PHASE: u64 = 4;
+    /// Game kind is not one of the supported arcade games
+    const E_WRONG_KIND: u64 = 5;
+    /// Display name exceeds the maximum length
+    const E_METADATA_TOO_LONG: u64 = 6;
 
     // Event actions
     const ACTION_CREATED: u8 = 1;
@@ -55,19 +66,33 @@ module arcade::wager {
     }
 
     /// Creates the game object, its APT pot, and escrows the creator's stake.
-    /// Returns the ConstructorRef so the calling game module can attach state.
-    public fun create_game(
+    /// Friend-only so only arcade game modules can mint games. Returns the
+    /// ConstructorRef so the calling game module can attach its own state.
+    public(friend) fun create_game(
         creator: &signer,
         kind: u8,
         stake: u64,
         metadata: String,
     ): ConstructorRef {
         assert!(stake > 0, E_ZERO_STAKE);
+        assert!(
+            kind == KIND_TIC_TAC_TOE || kind == KIND_CHECKERS || kind == KIND_BACKGAMMON,
+            E_WRONG_KIND
+        );
+        assert!(string::length(&metadata) <= METADATA_MAX_LENGTH, E_METADATA_TOO_LONG);
         let creator_addr = signer::address_of(creator);
 
         let ctor = object::create_named_object(creator, *string::bytes(&metadata));
         let game_signer = ctor.generate_signer();
         let pot = fungible_asset::create_store(&ctor, apt_metadata());
+        // Self-own the game object: after this, no account can sign as its
+        // owner, so the pot store on it is only reachable through wager's
+        // settlement paths (the ExtendRef lives inside Game).
+        let transfer_ref = ctor.generate_transfer_ref();
+        object::disable_ungated_transfer(&transfer_ref);
+        transfer_ref
+            .generate_linear_transfer_ref()
+            .transfer_with_ref(object::object_address(&pot));
 
         move_to(&game_signer, Game {
             phase: PHASE_OPEN,
@@ -107,6 +132,9 @@ module arcade::wager {
             hub::unlist(kind, game_addr);
         };
         emit(game_addr, ACTION_CANCELLED, signer::address_of(creator), balance);
+        // Named objects are not deletable by framework design (their addresses
+        // are deterministic), so cancelled games persist with an empty pot and
+        // phase = Settled instead of being burned.
     }
 
     // --- helpers ---
@@ -155,17 +183,17 @@ module arcade::wager {
     }
 
     #[view]
-    public fun phase(game_addr: address): u8 {
+    public fun phase(game_addr: address): u8 acquires Game {
         borrow_global<Game>(game_addr).phase
     }
 
     #[view]
-    public fun kind(game_addr: address): u8 {
+    public fun kind(game_addr: address): u8 acquires Game {
         borrow_global<Game>(game_addr).kind
     }
 
     #[view]
-    public fun stake(game_addr: address): u64 {
+    public fun stake(game_addr: address): u64 acquires Game {
         borrow_global<Game>(game_addr).stake
     }
 
@@ -175,7 +203,7 @@ module arcade::wager {
     }
 
     #[view]
-    public fun players(game_addr: address): (address, address) {
+    public fun players(game_addr: address): (address, address) acquires Game {
         let g = borrow_global<Game>(game_addr);
         (g.player_a, g.player_b)
     }
@@ -183,6 +211,7 @@ module arcade::wager {
     /// Called by game modules from their join entry function.
     public(friend) fun join_core(player: &signer, game_addr: address) acquires Game {
         let player_addr = signer::address_of(player);
+        let stake = borrow_global<Game>(game_addr).stake;
         {
             let game = borrow_global_mut<Game>(game_addr);
             assert!(game.phase == PHASE_OPEN, E_WRONG_PHASE);
@@ -191,11 +220,10 @@ module arcade::wager {
             game.phase = PHASE_IN_PROGRESS;
             game.last_move_at = timestamp::now_seconds();
             let kind = game.kind;
-            let stake = game.stake;
             transfer_in(player, game_addr, stake);
             hub::unlist(kind, game_addr);
         };
-        emit(game_addr, ACTION_JOINED, player_addr, 0);
+        emit(game_addr, ACTION_JOINED, player_addr, stake);
     }
 
     /// Pays the whole pot to `winner` and closes the game. Friend-only.
@@ -238,12 +266,12 @@ module arcade::wager {
     }
 
     #[view]
-    public fun last_move_at(game_addr: address): u64 {
+    public fun last_move_at(game_addr: address): u64 acquires Game {
         borrow_global<Game>(game_addr).last_move_at
     }
 
     #[view]
-    public fun time_since_last_move(game_addr: address): u64 {
+    public fun time_since_last_move(game_addr: address): u64 acquires Game {
         timestamp::now_seconds() - borrow_global<Game>(game_addr).last_move_at
     }
 
@@ -485,6 +513,45 @@ module arcade::wager {
         let game_addr = last_game_address(@0xD5, b"i4");
         join_core(opponent, game_addr);
         cancel(creator, game_addr);
+    }
+
+    #[test(creator = @0xF1, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_WRONG_KIND)]
+    fun test_create_rejects_unknown_kind(creator: &signer, deployer: &signer) {
+        setup_coin_and_player(@0xF1, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 99, 100, string::utf8(b"k"));
+        let _ = ctor;
+    }
+
+    #[test(creator = @0xF2, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_METADATA_TOO_LONG)]
+    fun test_create_rejects_long_metadata(creator: &signer, deployer: &signer) {
+        setup_coin_and_player(@0xF2, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"a game name that is definitely far too long to be accepted as an object seed"));
+        let _ = ctor;
+    }
+
+    #[test(creator = @0xE1, opponent = @0xE2, deployer = @arcade)]
+    #[expected_failure(abort_code = 0x20006)]
+    fun test_creator_cannot_drain_pot(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        // Review claim: the creator owns the game object, so they might be able
+        // to withdraw the pot with plain fungible_asset calls. They must not.
+        setup_coin_and_player(@0xE1, 10_000_000);
+        setup_coin_and_player(@0xE2, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"dr"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xE1, b"dr");
+        join_core(opponent, game_addr);
+        assert!(pot(game_addr) == 200);
+        let thief_store = primary_fungible_store::primary_store(@0xE1, apt_metadata());
+        fungible_asset::transfer(creator, pot_store(game_addr), thief_store, 200);
     }
 
     #[test(creator = @0xD7, opponent = @0xD8, deployer = @arcade)]

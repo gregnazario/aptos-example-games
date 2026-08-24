@@ -1,5 +1,6 @@
 /// Singleton registry of open games for lobby discovery.
 module arcade::hub {
+    use std::signer;
     use std::vector;
     use aptos_framework::object;
     use aptos_framework::simple_map::{Self, SimpleMap};
@@ -10,6 +11,8 @@ module arcade::hub {
     const E_NOT_INITIALIZED: u64 = 1;
     /// Game not present in the list being removed, or already listed
     const E_NOT_LISTED: u64 = 2;
+    /// Only the package account may initialize the canonical hub
+    const E_NOT_PACKAGE_ACCOUNT: u64 = 3;
 
     const SEED: vector<u8> = b"arcade-hub";
 
@@ -18,8 +21,9 @@ module arcade::hub {
         open: SimpleMap<u8, vector<address>>,
     }
 
-    /// Deployer call; safe to repeat.
-    public fun initialize(deployer: &signer) {
+    /// Package-account call; mints the canonical hub object. Safe to repeat.
+    public entry fun initialize(deployer: &signer) {
+        assert!(signer::address_of(deployer) == @arcade, E_NOT_PACKAGE_ACCOUNT);
         let addr = object::create_object_address(&signer::address_of(deployer), SEED);
         if (exists<Registry>(addr)) {
             return
@@ -72,9 +76,6 @@ module arcade::hub {
         assert!(found, E_NOT_LISTED);
         vector::remove(games, idx);
     }
-
-    #[test_only]
-    use std::signer;
 
     #[test(deployer = @arcade)]
     fun test_initialize_is_idempotent(deployer: &signer) {

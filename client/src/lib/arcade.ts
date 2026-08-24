@@ -33,7 +33,9 @@ export interface GameSummary {
 }
 
 export function arcadeDeployed(): boolean {
-  return /^0x[0-9a-fA-F]{1,64}$/.test(ARCADE_PACKAGE) && ARCADE_PACKAGE !== "0x0";
+  const value = ARCADE_PACKAGE.trim().toLowerCase();
+  // Any all-zero address (0x0, 0x000…0) means "not configured".
+  return /^0x[0-9a-f]+$/.test(value) && !/^0x0+$/.test(value);
 }
 
 async function view(fn: string, args: unknown[]): Promise<unknown[]> {

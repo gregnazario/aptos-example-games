@@ -7,7 +7,8 @@ vi.mock("./aptos", () => ({
   ansAptos: {},
 }));
 
-import { GameKind, getGameSummary, getOpenGames } from "./arcade";
+import { ARCADE_PACKAGE } from "./constants";
+import { GameKind, arcadeDeployed, getGameSummary, getOpenGames } from "./arcade";
 
 describe("arcade hub client", () => {
   beforeEach(() => {
@@ -23,6 +24,11 @@ describe("arcade hub client", () => {
         functionArguments: [GameKind.TicTacToe],
       },
     });
+  });
+
+  it("treats all-zero package addresses as not deployed", () => {
+    expect(ARCADE_PACKAGE).toBe("0x0"); // test env: unset
+    expect(arcadeDeployed()).toBe(false);
   });
 
   it("aggregates game summary views into one object", async () => {

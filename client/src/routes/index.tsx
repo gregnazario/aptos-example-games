@@ -50,6 +50,7 @@ function Field({
 
 function ArcadeLobby() {
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +63,8 @@ function ArcadeLobby() {
         );
         if (!cancelled) setCounts(Object.fromEntries(entries));
       } catch {
-        // Hub not deployed on this network yet — leave the counts hidden.
+        // Hub missing or unreachable on this network.
+        if (!cancelled) setFailed(true);
       }
     };
     void load();
@@ -91,7 +93,11 @@ function ArcadeLobby() {
             <li key={kind} className="flex items-center justify-between">
               <span className="text-foreground/90">{labels[kind]}</span>
               <span className="text-muted-foreground">
-                {counts === null ? "…" : `${counts[kind]} open`}
+                {failed
+                  ? "unavailable"
+                  : counts === null
+                    ? "…"
+                    : `${counts[kind]} open`}
               </span>
             </li>
           ))}
