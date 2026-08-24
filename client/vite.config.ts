@@ -38,7 +38,7 @@ export default defineConfig({
     nitro(
       cloudflare
         ? {
-            rollupConfig: { alias: aptosWorkerAlias },
+            alias: aptosWorkerAlias,
           }
         : undefined,
     ),
