@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { HowToPlay } from "@/components/HowToPlay";
 import { WalletClient } from "@/components/WalletProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { aptos } from "@/lib/aptos";
+import { GameKind, arcadeDeployed, getOpenGames } from "@/lib/arcade";
 import { MODULE_ADDRESS, NETWORK } from "@/lib/constants";
 import { resolveGameTarget } from "@/functions/game";
 
@@ -47,6 +48,59 @@ function Field({
   );
 }
 
+function ArcadeLobby() {
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const entries = await Promise.all(
+          ([GameKind.TicTacToe, GameKind.Checkers, GameKind.Backgammon] as const).map(
+            async (kind) => [kind, (await getOpenGames(kind)).length] as const,
+          ),
+        );
+        if (!cancelled) setCounts(Object.fromEntries(entries));
+      } catch {
+        // Hub not deployed on this network yet — leave the counts hidden.
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const labels: Record<number, string> = {
+    [GameKind.TicTacToe]: "Tic-tac-toe",
+    [GameKind.Checkers]: "Checkers",
+    [GameKind.Backgammon]: "Backgammon",
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Arcade lobby</CardTitle>
+        <CardDescription>
+          Wagered games escrow APT on-chain until the match settles.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2 text-sm">
+          {[GameKind.TicTacToe, GameKind.Checkers, GameKind.Backgammon].map((kind) => (
+            <li key={kind} className="flex items-center justify-between">
+              <span className="text-foreground/90">{labels[kind]}</span>
+              <span className="text-muted-foreground">
+                {counts === null ? "…" : `${counts[kind]} open`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 function LobbyPage() {
   return (
     <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -64,6 +118,7 @@ function LobbyPage() {
       </section>
 
       <div className="space-y-6">
+        {arcadeDeployed() && <ArcadeLobby />}
         <JoinCard />
         <WalletClient fallback={<CreatePlaceholder />}>
           <CreateCard />
