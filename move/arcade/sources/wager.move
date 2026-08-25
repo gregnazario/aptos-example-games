@@ -21,6 +21,7 @@ module arcade::wager {
     friend arcade::checkers_v2;
     friend arcade::backgammon;
     friend arcade::chinese_checkers;
+    friend arcade::chess;
 
     const PHASE_OPEN: u8 = 0;
     const PHASE_IN_PROGRESS: u8 = 1;
@@ -30,6 +31,7 @@ module arcade::wager {
     public const KIND_CHECKERS: u8 = 2;
     public const KIND_BACKGAMMON: u8 = 3;
     public const KIND_CHINESE_CHECKERS: u8 = 4;
+    public const KIND_CHESS: u8 = 5;
 
     /// Maximum display-name length; the name doubles as the object seed.
     const METADATA_MAX_LENGTH: u64 = 64;
@@ -94,7 +96,8 @@ module arcade::wager {
             kind == KIND_TIC_TAC_TOE
                 || kind == KIND_CHECKERS
                 || kind == KIND_BACKGAMMON
-                || kind == KIND_CHINESE_CHECKERS,
+                || kind == KIND_CHINESE_CHECKERS
+                || kind == KIND_CHESS,
             E_WRONG_KIND
         );
         assert!(string::length(&metadata) > 0, E_METADATA_EMPTY);

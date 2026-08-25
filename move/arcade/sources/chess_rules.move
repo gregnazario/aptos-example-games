@@ -917,6 +917,13 @@ module arcade::chess_rules {
         !in_check(&next, pos.side_to_move)
     }
 
+    // Field accessors for sibling modules (fields themselves stay private).
+    public fun side_to_move(pos: &Position): u8 { pos.side_to_move }
+    public fun castling_rights(pos: &Position): u8 { pos.castling }
+    public fun ep_target(pos: &Position): u8 { pos.ep_square }
+    public fun halfmove_clock(pos: &Position): u16 { pos.halfmove_clock }
+    public fun board_of(pos: &Position): vector<u8> { pos.board }
+
     /// Validate + apply + evaluate in one call; aborts E_INVALID_MOVE on an
     /// illegal move or bad promotion argument.
     public fun make_move(pos: &Position, from: u8, to_sq: u8, promo: u8): (Position, u8) {

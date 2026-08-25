@@ -60,6 +60,9 @@ jobs:
       - name: Compile checkers
         working-directory: move/checkers
         run: aptos move compile --named-addresses deploy_account=0xA11CE
+      - name: Compile arcade
+        working-directory: move/arcade
+        run: aptos move compile --named-addresses arcade=0xCAFE
       - name: Test arcade
         working-directory: move/arcade
         run: aptos move test --named-addresses arcade=0xCAFE
