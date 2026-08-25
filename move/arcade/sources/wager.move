@@ -597,13 +597,17 @@ module arcade::wager {
         let game_addr = last_game_address(@0xA4, b"ft2");
         join_core(opponent, game_addr);
         aptos_framework::timestamp::fast_forward_seconds(259_201);
+        // A forfeit must emit exactly one outcome event: FORFEITED (5). The
+        // count delta is the regression pin — checking only the last event
+        // would pass even if a stray SETTLED were emitted before it.
+        let events_before = event::counter(&borrow_global<Game>(game_addr).game_events);
         forfeit_timeout(opponent, game_addr);
         assert!(phase(game_addr) == 2);
         assert!(pot(game_addr) == 0);
         assert!(apt_balance(@0xA4) == 10_000_000);
         assert!(apt_balance(@0xA5) == 10_000_000);
-        // A forfeit must emit exactly one outcome event: FORFEITED (5).
         let game = borrow_global<Game>(game_addr);
+        assert!(event::counter(&game.game_events) == events_before + 1, 0);
         let events = event::emitted_events_by_handle(&game.game_events);
         let last = vector::borrow(&events, vector::length(&events) - 1);
         assert!(last.action == 5 && last.actor == @0xA5, 0);
