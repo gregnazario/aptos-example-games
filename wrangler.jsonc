@@ -1,0 +1,21 @@
+// Root-level deployment config for Cloudflare Workers Builds, which runs the
+// build and deploy from the repository root. The app itself lives in client/.
+// Build output comes from the root package.json build script.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aptos-example-games",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "client/.output/server/index.mjs",
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "client/.output/public"
+  },
+  "no_bundle": true,
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": ["**/*.mjs", "**/*.js"]
+    }
+  ]
+}
