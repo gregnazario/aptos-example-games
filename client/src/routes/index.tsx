@@ -63,6 +63,7 @@ function ArcadeLobby() {
               GameKind.Checkers,
               GameKind.Backgammon,
               GameKind.ChineseCheckers,
+              GameKind.Chess,
             ] as const
           ).map(
             async (kind) => [kind, (await getOpenGames(kind)).length] as const,
@@ -85,6 +86,7 @@ function ArcadeLobby() {
     [GameKind.Checkers]: "Checkers",
     [GameKind.Backgammon]: "Backgammon",
     [GameKind.ChineseCheckers]: "Chinese checkers",
+    [GameKind.Chess]: "Chess",
   };
 
   return (
@@ -102,6 +104,7 @@ function ArcadeLobby() {
             GameKind.Checkers,
             GameKind.Backgammon,
             GameKind.ChineseCheckers,
+            GameKind.Chess,
           ].map((kind) => (
             <li key={kind} className="flex items-center justify-between">
               <span className="text-foreground/90">{labels[kind]}</span>

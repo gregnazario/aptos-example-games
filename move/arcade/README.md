@@ -17,9 +17,10 @@ Shared foundation for the on-chain arcade: `wager` (escrow + settlement) and
   Game modules may implement turn-aware forfeits via `settle` (the stalled
   player loses the pot); `wager` itself cannot know whose turn it is, so its
   central path refunds both players instead of letting a caller name a loser.
-- The planned game modules (`tic_tac_toe_v2`, `checkers_v2`, `backgammon`)
-  are declared as `wager` friends at publish time — friends cannot be added
-  to an immutable package later, which is why their stubs ship in phase 0.
+- The phase-0 game-module stubs (`tic_tac_toe_v2`, `checkers_v2`,
+  `backgammon`) are declared as `wager` friends upfront. The package uses
+  the default `compatible` upgrade policy, so additional game modules can
+  still be added after publish by extending the friend list.
 
 ## Tests
 
@@ -30,8 +31,12 @@ aptos move test --named-addresses arcade=0xcafe
 
 ## Deploy (testnet)
 
-The package is treated as immutable: fixes ship as new module versions,
-never upgrades.
+The package publishes with the default `compatible` upgrade policy: fixes
+and new games ship as in-place upgrades that keep existing struct layouts
+and public function signatures intact. Because the deployer key can change
+code between publishes, it lives on a dedicated account; before any
+mainnet deployment, strengthen the package to the `immutable` policy
+(a one-way ratchet) so the audited code can no longer change.
 
 ```
 aptos init --network testnet --profile arcade-deploy
