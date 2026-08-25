@@ -1,0 +1,7 @@
+{
+  "name": "aptos-example-games",
+  "private": true,
+  "scripts": {
+    "build": "npm ci --prefix client && npm run build:cloudflare --prefix client"
+  }
+}

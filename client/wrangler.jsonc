@@ -1,0 +1,23 @@
+// Deployment config for the Cloudflare Worker serving the client.
+//
+// Used by Workers Builds and `wrangler deploy`. Paths are relative to client/.
+// Build first with `npm run build:cloudflare` (Nitro cloudflare_module preset),
+// which produces .output/server/index.mjs and .output/public/.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aptos-example-games",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": ".output/server/index.mjs",
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".output/public"
+  },
+  "no_bundle": true,
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": ["**/*.mjs", "**/*.js"]
+    }
+  ]
+}

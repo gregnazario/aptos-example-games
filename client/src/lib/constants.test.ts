@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { APTOS_NETWORK, APTOS_NETWORKS, NETWORK } from "./constants";
 
 describe("network mapping", () => {
-  test("SDK and wallet adapter share one Network enum value", () => {
+  test("defaults to devnet (legacy module keeps working with no env)", () => {
     expect(NETWORK).toBe("devnet");
     expect(APTOS_NETWORK).toBe(APTOS_NETWORKS.devnet);
     expect(APTOS_NETWORK).toBe(Network.DEVNET);
