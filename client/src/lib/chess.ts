@@ -4,8 +4,8 @@ import { ARCADE_PACKAGE } from "./constants";
 // Mirrors the outcome constants in move/arcade/sources/chess_rules.move.
 export const OUTCOME = {
   Ongoing: 0,
-  WhiteMated: 1, // white delivered mate, white won
-  BlackMated: 2, // black delivered mate, black won
+  WhiteWon: 1, // mate delivered by white: white won
+  BlackWon: 2, // mate delivered by black: black won
   Stalemate: 3,
   Insufficient: 4,
   FiftyMove: 5,
@@ -30,6 +30,8 @@ export const PIECE = {
   BKing: 14,
 } as const;
 
+// chess::state returns a flat six-value tuple; the Aptos view API hands back
+// one array element per return value (no extra nesting).
 export interface ChessState {
   sideToMove: number; // 0 white, 1 black
   castling: number;
@@ -63,8 +65,8 @@ export async function getChessBoard(address: string): Promise<number[]> {
 }
 
 export async function getChessState(address: string): Promise<ChessState> {
-  const [[stm, castling, ep, clock, outcome, creatorIsWhite]] = await view<
-    [number, number, number, bigint, number, boolean]
+  const [stm, castling, ep, clock, outcome, creatorIsWhite] = await view<
+    number | boolean | bigint
   >("chess::state", [address]);
   return {
     sideToMove: Number(stm),
@@ -74,6 +76,12 @@ export async function getChessState(address: string): Promise<ChessState> {
     outcome: Number(outcome),
     creatorIsWhite: Boolean(creatorIsWhite),
   };
+}
+
+/** Live read of wager::timeout_seconds instead of a duplicated constant. */
+export async function getTimeoutSeconds(): Promise<number> {
+  const [seconds] = await view<bigint>("wager::timeout_seconds", []);
+  return Number(seconds ?? FORFEIT_SECONDS_FALLBACK);
 }
 
 // The Move view takes Option<u8>; the empty array encodes none.
@@ -88,8 +96,8 @@ export async function getLegalMoves(
   return (Array.isArray(moves) ? moves : []).map((m) => unpackMove(Number(m)));
 }
 
-/** Mirrors wager::timeout_seconds — 3 days of inactivity. */
-export const FORFEIT_SECONDS = 259_200;
+/** Fallback only until wager::timeout_seconds answers; 3 days of inactivity. */
+export const FORFEIT_SECONDS_FALLBACK = 259_200;
 
 export async function getSecondsSinceLastMove(address: string): Promise<number> {
   const [seconds] = await view<bigint>("wager::time_since_last_move", [address]);

@@ -34,10 +34,10 @@ module arcade::chess_rules {
 
     // Outcomes (mirrored by client and chess::State.outcome).
     public const OUTCOME_ONGOING: u8 = 0;
-    /// White delivered mate; white won.
-    public const OUTCOME_WHITE_MATED: u8 = 1;
-    /// Black delivered mate; black won.
-    public const OUTCOME_BLACK_MATED: u8 = 2;
+    /// Mate delivered by white: white won.
+    public const OUTCOME_WHITE_WON: u8 = 1;
+    /// Mate delivered by black: black won.
+    public const OUTCOME_BLACK_WON: u8 = 2;
     public const OUTCOME_STALEMATE: u8 = 3;
     public const OUTCOME_INSUFFICIENT: u8 = 4;
     public const OUTCOME_FIFTY_MOVE: u8 = 5;
@@ -319,10 +319,16 @@ module arcade::chess_rules {
         if (fc == tc) {
             let r1: u16 = if (white) fr - 1 else fr + 1;
             if (tr == r1 && dest == EMPTY) return true;
-            let r2: u16 = if (white) fr - 2 else fr + 2;
-            if (fr == start_row && tr == r2) {
-                let mid: u16 = if (white) fr - 1 else fr + 1;
-                return dest == EMPTY && piece_at(&pos.board, ((mid * 8) + tc) as u8) == EMPTY
+            // The double push exists only from the start row; computing its
+            // target unconditionally would underflow for pawns already on
+            // their second-to-last rank (e.g. a white pawn on row 1).
+            if (fr == start_row) {
+                let r2: u16 = if (white) fr - 2 else fr + 2;
+                if (tr == r2) {
+                    let mid: u16 = if (white) fr - 1 else fr + 1;
+                    return dest == EMPTY
+                        && piece_at(&pos.board, ((mid * 8) + tc) as u8) == EMPTY
+                };
             };
             return false
         };
@@ -1030,7 +1036,7 @@ module arcade::chess_rules {
     public fun evaluate_terminal(next: &Position): u8 {
         if (!has_any_legal_move(next)) {
             if (in_check(next, next.side_to_move)) {
-                return if (next.side_to_move == WHITE) OUTCOME_BLACK_MATED else OUTCOME_WHITE_MATED
+                return if (next.side_to_move == WHITE) OUTCOME_BLACK_WON else OUTCOME_WHITE_WON
             };
             return OUTCOME_STALEMATE
         };
@@ -1110,6 +1116,39 @@ module arcade::chess_rules {
     }
 
     #[test]
+    fun test_second_rank_pawn_enumeration_does_not_abort() {
+        // Regression (Pi review): a white pawn on its second-to-last rank used
+        // to abort enumeration because the double-push target was computed
+        // unconditionally (fr - 2 underflows at row 1).
+        let board = empty_board();
+        place(&mut board, 9, W_PAWN); // b7
+        place(&mut board, 1, B_PAWN); // b8 blocked
+        place(&mut board, 60, W_KING);
+        place(&mut board, 4, B_KING);
+        let pos = pos_with(board);
+        pos.side_to_move = WHITE;
+        let moves = legal_moves(&pos, &option::none());
+        assert!(vector::length(&moves) > 0, 0); // king moves exist
+        assert!(has_any_legal_move(&pos), 0);
+        // No enumerated entry may claim the blocked b8 push.
+        let i: u64 = 0;
+        while ((i as u64) < vector::length(&moves)) {
+            let (f, t, _) = unpack_move(*vector::borrow(&moves, i));
+            assert!(!(f == 9 && t == 1), 0);
+            i = i + 1;
+        };
+
+        // Open promotion square: exactly the four promo entries for b7-b8.
+        let board2 = empty_board();
+        place(&mut board2, 9, W_PAWN);
+        place(&mut board2, 60, W_KING);
+        place(&mut board2, 4, B_KING);
+        let pos2 = pos_with(board2);
+        let promos = legal_moves(&pos2, &option::some(9));
+        assert!(vector::length(&promos) == 4, 0);
+    }
+
+    #[test]
     fun test_start_position_has_twenty_moves() {
         let pos = start_position();
         let moves = legal_moves(&pos, &option::none());
@@ -1135,7 +1174,7 @@ module arcade::chess_rules {
         let p6 = apply_move(&p5, 6, 21, 0);    // 3... Nf6
         let (p7, outcome) = make_move(&p6, 31, 13, W_QUEEN - W_QUEEN); // 4. Qxf7# (promo arg must be 0!)
         let _ = outcome;
-        assert!(evaluate_terminal(&p7) == OUTCOME_WHITE_MATED, 0);
+        assert!(evaluate_terminal(&p7) == OUTCOME_WHITE_WON, 0);
         assert!(outcome != OUTCOME_ONGOING, 0);
     }
 
@@ -1198,7 +1237,7 @@ module arcade::chess_rules {
         assert!(!has_any_legal_move(&next3), 321);
         // White delivered mate, so the winner-named outcome is WHITE_MATED
         // even though BLACK is the side left without moves.
-        assert!(evaluate_terminal(&next3) == OUTCOME_WHITE_MATED, 0);
+        assert!(evaluate_terminal(&next3) == OUTCOME_WHITE_WON, 0);
     }
 
 }

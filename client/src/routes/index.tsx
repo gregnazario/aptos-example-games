@@ -104,6 +104,7 @@ function ArcadeLobby() {
             GameKind.Checkers,
             GameKind.Backgammon,
             GameKind.ChineseCheckers,
+            GameKind.Chess,
           ].map((kind) => (
             <li key={kind} className="flex items-center justify-between">
               <span className="text-foreground/90">{labels[kind]}</span>

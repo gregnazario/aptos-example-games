@@ -62,8 +62,10 @@ module arcade::chess {
 
     /// Joins and flips for colors: u8_range(0, 2) == 0 means the creator gets
     /// white. Randomness-bearing — clients submit with simulation disabled.
-    #[lint::allow_unsafe_randomness]
-    public entry fun join(player: &signer, game_addr: address) acquires State {
+    // Plain (non-public) entry: #[randomness] is restricted to private or
+    // public(friend) entries, and transactions call this directly anyway.
+    #[randomness]
+    entry fun join(player: &signer, game_addr: address) acquires State {
         wager::join_core(player, game_addr);
         let flip = randomness::u8_range(0, 2);
         borrow_global_mut<State>(game_addr).creator_is_white = flip == 0;
@@ -132,6 +134,7 @@ module arcade::chess {
     public entry fun claim_forfeit(caller: &signer, game_addr: address) acquires State {
         let caller_addr = signer::address_of(caller);
         assert_player(game_addr, caller_addr);
+        assert!(wager::phase(game_addr) == PHASE_IN_PROGRESS, E_NOT_YOUR_TURN);
         assert!(
             timestamp::now_seconds() - wager::last_move_at(game_addr) > wager::timeout_seconds(),
             E_TIMEOUT_NOT_REACHED,
@@ -146,7 +149,7 @@ module arcade::chess {
     fun finish(game_addr: address, outcome: u8, winner: address) acquires State {
         borrow_global_mut<State>(game_addr).outcome = outcome;
         emit(game_addr, ACTION_GAME_OVER, winner, 0, 0, 0, outcome);
-        if (outcome == chess_rules::OUTCOME_WHITE_MATED || outcome == chess_rules::OUTCOME_BLACK_MATED) {
+        if (outcome == chess_rules::OUTCOME_WHITE_WON || outcome == chess_rules::OUTCOME_BLACK_WON) {
             wager::settle(game_addr, winner);
         } else {
             wager::settle_draw(game_addr);

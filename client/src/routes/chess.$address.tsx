@@ -26,7 +26,7 @@ import {
 } from "@/lib/arcade";
 import { aptos } from "@/lib/aptos";
 import {
-  FORFEIT_SECONDS,
+  FORFEIT_SECONDS_FALLBACK,
   OUTCOME,
   PackedMove,
   colorOf,
@@ -34,6 +34,7 @@ import {
   getChessState,
   getLegalMoves,
   getSecondsSinceLastMove,
+  getTimeoutSeconds,
 } from "@/lib/chess";
 import { ARCADE_PACKAGE } from "@/lib/constants";
 
@@ -51,9 +52,9 @@ function isOwnPiece(color: "white" | "black", piece: number): boolean {
 
 function outcomeText(outcome: number): string | null {
   switch (outcome) {
-    case OUTCOME.WhiteMated:
+    case OUTCOME.WhiteWon:
       return "Checkmate — white wins the pot.";
-    case OUTCOME.BlackMated:
+    case OUTCOME.BlackWon:
       return "Checkmate — black wins the pot.";
     case OUTCOME.Stalemate:
       return "Draw by stalemate — stakes refunded.";
@@ -79,6 +80,7 @@ function ChessPage() {
   const [sideToMove, setSideToMove] = useState<number>(0);
   const [creatorIsWhite, setCreatorIsWhite] = useState<boolean>(true);
   const [secondsSinceMove, setSecondsSinceMove] = useState<number>(0);
+  const [timeoutSeconds, setTimeoutSeconds] = useState<number>(FORFEIT_SECONDS_FALLBACK);
   const [outcome, setOutcome] = useState<number>(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [targets, setTargets] = useState<PackedMove[]>([]);
@@ -92,11 +94,12 @@ function ChessPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [s, state, b, seconds] = await Promise.all([
+      const [s, state, b, seconds, timeout] = await Promise.all([
         getGameSummary(gameAddress),
         getChessState(gameAddress),
         getChessBoard(gameAddress),
         getSecondsSinceLastMove(gameAddress),
+        getTimeoutSeconds(),
       ]);
       setSummary(s);
       setSideToMove(state.sideToMove);
@@ -104,6 +107,7 @@ function ChessPage() {
       setOutcome(state.outcome);
       setBoard(b);
       setSecondsSinceMove(seconds);
+      setTimeoutSeconds(timeout);
     } catch {
       setError("Could not read this game from chain. Is the address right?");
     }
@@ -300,7 +304,7 @@ function ChessPage() {
                 Resign
               </Button>
             )}
-            {inProgress && myColor && secondsSinceMove > FORFEIT_SECONDS && !myTurn && (
+            {inProgress && myColor && secondsSinceMove > timeoutSeconds && !myTurn && (
               <Button
                 variant="destructive"
                 disabled={pending}
@@ -309,7 +313,7 @@ function ChessPage() {
                 Claim forfeit (opponent stalled)
               </Button>
             )}
-            {inProgress && myColor && secondsSinceMove > FORFEIT_SECONDS && myTurn && (
+            {inProgress && myColor && secondsSinceMove > timeoutSeconds && myTurn && (
               <Button
                 variant="outline"
                 disabled={pending}
