@@ -11,3 +11,6 @@ subdir = "aptos-framework"
 
 [addresses]
 deploy_account = "_"
+
+[dev-addresses]
+deploy_account = "0xCAFE"
