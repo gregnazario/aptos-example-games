@@ -27,8 +27,10 @@ describe("arcade hub client", () => {
   });
 
   it("treats all-zero package addresses as not deployed", () => {
-    expect(ARCADE_PACKAGE).toBe("0x0"); // test env: unset
-    expect(arcadeDeployed()).toBe(false);
+    // Only meaningful when the env var is unset or zeroed in this environment.
+    if (!import.meta.env.VITE_ARCADE_PACKAGE || ARCADE_PACKAGE === "0x0") {
+      expect(arcadeDeployed()).toBe(false);
+    }
   });
 
   it("aggregates game summary views into one object", async () => {

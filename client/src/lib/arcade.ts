@@ -32,16 +32,19 @@ export interface GameSummary {
   playerB: string;
 }
 
+// Normalized (trimmed, lowercased) package address used everywhere, so a value
+// with stray whitespace can't pass the gate but poison view calls.
+const ARCADE_PACKAGE_ID = ARCADE_PACKAGE.trim().toLowerCase();
+
 export function arcadeDeployed(): boolean {
-  const value = ARCADE_PACKAGE.trim().toLowerCase();
   // Any all-zero address (0x0, 0x000…0) means "not configured".
-  return /^0x[0-9a-f]+$/.test(value) && !/^0x0+$/.test(value);
+  return /^0x[0-9a-f]+$/.test(ARCADE_PACKAGE_ID) && !/^0x0+$/.test(ARCADE_PACKAGE_ID);
 }
 
 async function view(fn: string, args: unknown[]): Promise<unknown[]> {
   const result = await aptos.view({
     payload: {
-      function: `${ARCADE_PACKAGE}::${fn}` as `${string}::${string}::${string}`,
+      function: `${ARCADE_PACKAGE_ID}::${fn}` as `${string}::${string}::${string}`,
       functionArguments: args as never[],
     },
   });

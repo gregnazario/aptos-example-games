@@ -1,6 +1,11 @@
 // Root-level deployment config for Cloudflare Workers Builds, which runs the
 // build and deploy from the repository root. The app itself lives in client/.
 // Build output comes from the root package.json build script.
+//
+// NOTE: Workers Builds builds use whatever environment the dashboard provides.
+// When the arcade package is published, set VITE_NETWORK=testnet and
+// VITE_ARCADE_PACKAGE=<address> in the service's build environment; the
+// GitHub Actions deploy path reads the same values from repo variables.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "aptos-example-games",

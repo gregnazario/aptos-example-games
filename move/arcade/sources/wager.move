@@ -12,6 +12,12 @@ module arcade::wager {
     use std::option;
     use arcade::hub;
 
+    // Game modules arriving in phases 1-3. Declared now because the package
+    // publishes immutably — friends cannot be added after the fact.
+    friend arcade::tic_tac_toe_v2;
+    friend arcade::checkers_v2;
+    friend arcade::backgammon;
+
     const PHASE_OPEN: u8 = 0;
     const PHASE_IN_PROGRESS: u8 = 1;
     const PHASE_SETTLED: u8 = 2;
@@ -35,6 +41,10 @@ module arcade::wager {
     const E_WRONG_KIND: u64 = 5;
     /// Display name exceeds the maximum length
     const E_METADATA_TOO_LONG: u64 = 6;
+    /// Timeout not yet reached for forfeit/refund claims
+    const E_TIMEOUT_NOT_REACHED: u64 = 7;
+    /// Display name must not be empty
+    const E_METADATA_EMPTY: u64 = 8;
 
     // Event actions
     const ACTION_CREATED: u8 = 1;
@@ -79,6 +89,7 @@ module arcade::wager {
             kind == KIND_TIC_TAC_TOE || kind == KIND_CHECKERS || kind == KIND_BACKGAMMON,
             E_WRONG_KIND
         );
+        assert!(string::length(&metadata) > 0, E_METADATA_EMPTY);
         assert!(string::length(&metadata) <= METADATA_MAX_LENGTH, E_METADATA_TOO_LONG);
         let creator_addr = signer::address_of(creator);
 
@@ -263,6 +274,29 @@ module arcade::wager {
     /// Seconds after `last_move_at` without a move before forfeit can be claimed.
     public fun timeout_seconds(): u64 {
         259_200
+    }
+
+    /// Central liveness safety net: after the play timeout, either player can
+    /// unwind the game with a full split refund. Turn-aware forfeits (where
+    /// the stalled player loses the pot) belong to the game modules via
+    /// `settle`; wager cannot know whose turn it is, and letting a caller
+    /// name the loser would let either player steal the pot.
+    public entry fun forfeit_timeout(caller: &signer, game_addr: address) acquires Game {
+        {
+            let game = borrow_global<Game>(game_addr);
+            let caller_addr = signer::address_of(caller);
+            assert!(game.phase == PHASE_IN_PROGRESS, E_WRONG_PHASE);
+            assert!(
+                caller_addr == game.player_a || caller_addr == game.player_b,
+                E_NOT_ALLOWED
+            );
+            assert!(
+                timestamp::now_seconds() - game.last_move_at > timeout_seconds(),
+                E_TIMEOUT_NOT_REACHED
+            );
+        };
+        settle_draw(game_addr);
+        emit(game_addr, ACTION_FORFEITED, signer::address_of(caller), 0);
     }
 
     #[view]
@@ -515,6 +549,74 @@ module arcade::wager {
         cancel(creator, game_addr);
     }
 
+    #[test(creator = @0xA1, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_METADATA_EMPTY)]
+    fun test_create_rejects_empty_metadata(creator: &signer, deployer: &signer) {
+        setup_coin_and_player(@0xA1, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b""));
+        let _ = ctor;
+    }
+
+    #[test(creator = @0xA2, opponent = @0xA3, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_TIMEOUT_NOT_REACHED)]
+    fun test_forfeit_rejected_before_timeout(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0xA2, 10_000_000);
+        setup_coin_and_player(@0xA3, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"ft"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xA2, b"ft");
+        join_core(opponent, game_addr);
+        aptos_framework::timestamp::fast_forward_seconds(100);
+        forfeit_timeout(creator, game_addr);
+    }
+
+    #[test(creator = @0xA4, opponent = @0xA5, deployer = @arcade)]
+    fun test_forfeit_after_timeout_refunds_both(
+        creator: &signer,
+        opponent: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0xA4, 10_000_000);
+        setup_coin_and_player(@0xA5, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"ft2"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xA4, b"ft2");
+        join_core(opponent, game_addr);
+        aptos_framework::timestamp::fast_forward_seconds(259_201);
+        forfeit_timeout(opponent, game_addr);
+        assert!(phase(game_addr) == 2);
+        assert!(pot(game_addr) == 0);
+        assert!(apt_balance(@0xA4) == 10_000_000);
+        assert!(apt_balance(@0xA5) == 10_000_000);
+    }
+
+    #[test(creator = @0xA6, opponent = @0xA7, other = @0xA8, deployer = @arcade)]
+    #[expected_failure(abort_code = arcade::wager::E_NOT_ALLOWED)]
+    fun test_forfeit_rejects_non_player(
+        creator: &signer,
+        opponent: &signer,
+        other: &signer,
+        deployer: &signer,
+    ) acquires Game {
+        setup_coin_and_player(@0xA6, 10_000_000);
+        setup_coin_and_player(@0xA7, 10_000_000);
+        setup_coin_and_player(@0xA8, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, 1, 100, string::utf8(b"ft3"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xA6, b"ft3");
+        join_core(opponent, game_addr);
+        aptos_framework::timestamp::fast_forward_seconds(259_201);
+        forfeit_timeout(other, game_addr);
+    }
+
     #[test(creator = @0xF1, deployer = @arcade)]
     #[expected_failure(abort_code = arcade::wager::E_WRONG_KIND)]
     fun test_create_rejects_unknown_kind(creator: &signer, deployer: &signer) {
@@ -534,6 +636,9 @@ module arcade::wager {
     }
 
     #[test(creator = @0xE1, opponent = @0xE2, deployer = @arcade)]
+    // 0x20006 = object::EMAXIMUM_NESTING (out_of_range reason 6) raised inside
+    // object::owns while walking the self-ownership chain for an account signer;
+    // observed empirically on aptos-framework rev "mainnet" with aptos CLI 9.5.
     #[expected_failure(abort_code = 0x20006)]
     fun test_creator_cannot_drain_pot(
         creator: &signer,

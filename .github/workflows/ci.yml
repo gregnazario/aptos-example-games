@@ -81,6 +81,11 @@ jobs:
       - name: Install
         run: npm ci
       - name: Build for Cloudflare Workers
+        env:
+          # Repo variables flip the deployed network when the arcade package
+          # ships; until then deploys stay on the devnet legacy game.
+          VITE_NETWORK: ${{ vars.VITE_NETWORK || 'devnet' }}
+          VITE_ARCADE_PACKAGE: ${{ vars.VITE_ARCADE_PACKAGE || '' }}
         run: npm run build:cloudflare
       - name: Deploy to Cloudflare
         env:

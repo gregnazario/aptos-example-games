@@ -13,6 +13,8 @@ module arcade::hub {
     const E_NOT_LISTED: u64 = 2;
     /// Only the package account may initialize the canonical hub
     const E_NOT_PACKAGE_ACCOUNT: u64 = 3;
+    /// Game is already listed as open
+    const E_ALREADY_LISTED: u64 = 4;
 
     const SEED: vector<u8> = b"arcade-hub";
 
@@ -63,7 +65,7 @@ module arcade::hub {
         };
         let games = simple_map::borrow_mut(&mut registry.open, &kind);
         let (found, _) = vector::index_of(games, &game);
-        assert!(!found, E_NOT_LISTED);
+        assert!(!found, E_ALREADY_LISTED);
         vector::push_back(games, game);
     }
 

@@ -13,7 +13,13 @@ Shared foundation for the on-chain arcade: `wager` (escrow + settlement) and
   what settlement owes (pinned by tests).
 - Terminal states are one-shot (`PHASE_SETTLED` gate).
 - Every open game has a player-callable exit: creator `cancel` while open,
-  timeout forfeit once playing (3 days).
+  and a central `forfeit_timeout` split refund after 3 days of inactivity.
+  Game modules may implement turn-aware forfeits via `settle` (the stalled
+  player loses the pot); `wager` itself cannot know whose turn it is, so its
+  central path refunds both players instead of letting a caller name a loser.
+- The planned game modules (`tic_tac_toe_v2`, `checkers_v2`, `backgammon`)
+  are declared as `wager` friends at publish time — friends cannot be added
+  to an immutable package later, which is why their stubs ship in phase 0.
 
 ## Tests
 
