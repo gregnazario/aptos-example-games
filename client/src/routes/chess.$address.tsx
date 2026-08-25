@@ -136,7 +136,13 @@ function ChessPage() {
     ((sideToMove === 0 && myColor === "white") ||
       (sideToMove === 1 && myColor === "black"));
 
-  const submit = async (fn: string, args: unknown[]) => {
+  // Randomness-bearing entries (chess::join) must NEVER be simulated: the
+  // randomness bridge is unavailable during simulation, so a simulated run
+  // would abort even though the real transaction succeeds. This dapp performs
+  // no simulation anywhere; wallets that pre-simulate must special-case
+  // randomness payloads (Petra does). Kept as a separate named path so the
+  // constraint is visible at every randomness call site.
+  const submitNoSimulation = async (fn: string, args: unknown[]) => {
     setError("");
     setPending(true);
     try {
@@ -156,6 +162,8 @@ function ChessPage() {
       setPending(false);
     }
   };
+
+  const submit = async (fn: string, args: unknown[]) => submitNoSimulation(fn, args);
 
   const onSquareClick = async (sq: number) => {
     if (!board || !inProgress || !myTurn || pending) return;
@@ -269,7 +277,7 @@ function ChessPage() {
             {summary && summary.phase === GamePhase.Open && connected && viewer !== summary.playerA.toLowerCase() && (
               <Button
                 disabled={pending}
-                onClick={() => void submit("chess::join", [gameAddress])}
+                onClick={() => void submitNoSimulation("chess::join", [gameAddress])}
               >
                 Join and escrow stake
               </Button>
