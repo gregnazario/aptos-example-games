@@ -252,18 +252,25 @@ module arcade::wager {
 
     /// Splits the pot; both players get their stake back.
     public(friend) fun settle_draw(game_addr: address) acquires Game {
-        {
+        let (actor, amount) = split_refund(game_addr);
+        emit(game_addr, ACTION_SETTLED, actor, amount);
+    }
+
+    /// Closes an in-progress game and refunds both players their stake
+    /// (remainder/dust to player_b). Returns (player_a, total refunded) so
+    /// each caller emits exactly one outcome event of its own kind.
+    fun split_refund(game_addr: address): (address, u64) acquires Game {
+        let (stake, total) = {
             let game = borrow_global_mut<Game>(game_addr);
             assert!(game.phase == PHASE_IN_PROGRESS, E_WRONG_PHASE);
             game.phase = PHASE_SETTLED;
+            (game.stake, 2 * game.stake)
         };
-        let (a, b, stake) = {
-            let game = borrow_global<Game>(game_addr);
-            (game.player_a, game.player_b, game.stake)
-        };
-        pay_out(game_addr, a, stake);
-        pay_out(game_addr, b, pot_balance(game_addr)); // remainder incl. any dust
-        emit(game_addr, ACTION_SETTLED, a, 2 * stake);
+        let player_a = borrow_global<Game>(game_addr).player_a;
+        let player_b = borrow_global<Game>(game_addr).player_b;
+        pay_out(game_addr, player_a, stake);
+        pay_out(game_addr, player_b, pot_balance(game_addr)); // remainder incl. any dust
+        (player_a, total)
     }
 
     /// Games call this on every accepted move.
@@ -295,8 +302,8 @@ module arcade::wager {
                 E_TIMEOUT_NOT_REACHED
             );
         };
-        settle_draw(game_addr);
-        emit(game_addr, ACTION_FORFEITED, signer::address_of(caller), 0);
+        let (_, amount) = split_refund(game_addr);
+        emit(game_addr, ACTION_FORFEITED, signer::address_of(caller), amount);
     }
 
     #[view]
@@ -595,6 +602,11 @@ module arcade::wager {
         assert!(pot(game_addr) == 0);
         assert!(apt_balance(@0xA4) == 10_000_000);
         assert!(apt_balance(@0xA5) == 10_000_000);
+        // A forfeit must emit exactly one outcome event: FORFEITED (5).
+        let game = borrow_global<Game>(game_addr);
+        let events = event::emitted_events_by_handle(&game.game_events);
+        let last = vector::borrow(&events, vector::length(&events) - 1);
+        assert!(last.action == 5 && last.actor == @0xA5, 0);
     }
 
     #[test(creator = @0xA6, opponent = @0xA7, other = @0xA8, deployer = @arcade)]
