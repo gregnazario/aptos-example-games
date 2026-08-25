@@ -59,9 +59,22 @@ async function view<T>(fn: string, args: unknown[]): Promise<T[]> {
   return result as T[];
 }
 
+/** REST represents vector<u8> as a hex string; normalize to byte arrays. */
+export function bytesFromU8Vector(value: unknown): number[] {
+  if (typeof value === "string") {
+    const hex = value.startsWith("0x") ? value.slice(2) : value;
+    const out: number[] = [];
+    for (let i = 0; i < hex.length; i += 2) {
+      out.push(parseInt(hex.slice(i, i + 2), 16));
+    }
+    return out;
+  }
+  return Array.from((value as number[]) ?? []);
+}
+
 export async function getChessBoard(address: string): Promise<number[]> {
-  const [board] = await view<bigint>("chess::board", [address]);
-  return Array.from((board as unknown as number[]) ?? []);
+  const [board] = await view<unknown>("chess::board", [address]);
+  return bytesFromU8Vector(board);
 }
 
 export async function getChessState(address: string): Promise<ChessState> {
@@ -84,14 +97,15 @@ export async function getTimeoutSeconds(): Promise<number> {
   return Number(seconds ?? FORFEIT_SECONDS_FALLBACK);
 }
 
-// The Move view takes Option<u8>; the empty array encodes none.
+// The Move view uses a u8 sentinel (255) instead of an Option argument —
+// options serialize ambiguously across clients.
 export async function getLegalMoves(
   address: string,
   from?: number,
 ): Promise<PackedMove[]> {
-  const [moves] = await view<bigint[]>("chess::legal_moves_view", [
+  const [moves] = await view<number[]>("chess::legal_moves_view", [
     address,
-    from === undefined ? [] : [from],
+    from === undefined ? 255 : from,
   ]);
   return (Array.isArray(moves) ? moves : []).map((m) => unpackMove(Number(m)));
 }

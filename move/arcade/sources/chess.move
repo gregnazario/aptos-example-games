@@ -14,6 +14,9 @@ module arcade::chess {
     // Mirrors wager's private PHASE_IN_PROGRESS (client enum keeps the same).
     const PHASE_IN_PROGRESS: u8 = 1;
 
+    /// legal_moves_view filter sentinel: every move, regardless of origin.
+    const NO_FILTER_SQUARE: u8 = 255;
+
     // ChessEvent actions.
     const ACTION_MOVED: u8 = 1;
     const ACTION_GAME_OVER: u8 = 2;
@@ -203,9 +206,17 @@ module arcade::chess {
         )
     }
 
+    /// All legal moves, or only those originating at `from` unless `from` is
+    /// 255 (no square has that index, so it serves as the "no filter"
+    /// sentinel — friendlier over the wire than an Option argument).
     #[view]
-    public fun legal_moves_view(game_addr: address, from: Option<u8>): vector<u16> acquires State {
-        chess_rules::legal_moves(&borrow_global<State>(game_addr).pos, &from)
+    public fun legal_moves_view(game_addr: address, from: u8): vector<u16> acquires State {
+        let filter = if (from == NO_FILTER_SQUARE) {
+            option::none()
+        } else {
+            option::some(from)
+        };
+        chess_rules::legal_moves(&borrow_global<State>(game_addr).pos, &filter)
     }
 
     // ==================================================================

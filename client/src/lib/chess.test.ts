@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bytesFromU8Vector,
   colorOf,
   parseSquare,
   pieceGlyph,
@@ -83,5 +84,17 @@ describe("colorOf", () => {
 
   it("returns null for spectators", () => {
     expect(colorOf({ creatorIsWhite: true }, players, "0xccc")).toBeNull();
+  });
+});
+
+describe("bytesFromU8Vector", () => {
+  it("decodes the hex-string form the REST API returns", () => {
+    expect(bytesFromU8Vector("0x00060f")).toEqual([0, 6, 15]);
+    expect(bytesFromU8Vector("ff")).toEqual([255]);
+  });
+
+  it("passes through plain numeric arrays", () => {
+    expect(bytesFromU8Vector([1, 2])).toEqual([1, 2]);
+    expect(bytesFromU8Vector(undefined)).toEqual([]);
   });
 });
