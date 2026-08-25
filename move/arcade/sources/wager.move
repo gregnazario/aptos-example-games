@@ -12,9 +12,11 @@ module arcade::wager {
     use std::option;
     use arcade::hub;
 
-    // Game modules arriving in phases 1-3, plus chinese_checkers reserved
-    // post-phase-3. Declared now because the package publishes immutably —
-    // friends cannot be added after the fact.
+    // Game modules arriving in later phases, plus chinese_checkers reserved
+    // post-phase-3. The package publishes under the default `compatible`
+    // upgrade policy, so future games can also be added post-publish by
+    // extending this list; these ship in phase 0 because their stubs are
+    // part of the reviewed foundation.
     friend arcade::tic_tac_toe_v2;
     friend arcade::checkers_v2;
     friend arcade::backgammon;

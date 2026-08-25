@@ -4,6 +4,14 @@ Date: 2026-08-24
 Status: Approved direction (approach A: object-per-game arcade package)
 Target: three wagered games, audited, deployed and playable on Aptos **testnet**
 
+> **2026-08-25 amendment:** deployment pivoted from an immutable package to
+> the default `compatible` upgrade policy — new game modules and `wager`
+> friend declarations can be added post-publish. Trade-off accepted: the
+> deployer key can alter code between publishes, mitigated by a dedicated
+> deployer account and strengthening to `immutable` before any mainnet
+> deployment. Chess was also added to the program as the next phase; see
+> `2026-08-25-chess-phase-design.md`.
+
 ## Goals
 
 1. Tic-tac-toe, checkers, and backgammon playable end-to-end on testnet with fixed-APT wagers (winner-take-all).
