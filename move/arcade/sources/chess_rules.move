@@ -2,6 +2,7 @@
 /// No global storage — every function is a pure computation over `Position`,
 /// so the entire ruleset is unit-testable without accounts or escrow.
 module arcade::chess_rules {
+    use std::option::{Self, Option};
     use std::vector;
 
     // Piece codes. White 1..6; black adds the color bit (8).
@@ -882,4 +883,315 @@ module arcade::chess_rules {
         assert!(piece_at(&after3.board, 19) == W_PAWN, 0);
         assert!(piece_at(&after3.board, 27) == EMPTY, 0);
     }
+
+    // ------------------------------------------------------------------
+    // Legality, enumeration, packing, terminals
+    // ------------------------------------------------------------------
+
+    /// Does `from -> to` land a pawn on its promotion rank?
+    public fun promo_required(board: &vector<u8>, from: u8, to_sq: u8): bool {
+        let piece = piece_at(board, from);
+        (piece == W_PAWN && row_of(to_sq) == 0) || (piece == B_PAWN && row_of(to_sq) == 7)
+    }
+
+    /// Promotion argument rules: required exactly on the last rank with a
+    /// real piece type; forbidden (zero) everywhere else.
+    fun promo_valid(piece: u8, to_sq: u8, promo: u8): bool {
+        let needs = (piece == W_PAWN && row_of(to_sq) == 0)
+            || (piece == B_PAWN && row_of(to_sq) == 7);
+        if (needs) {
+            return promo == W_KNIGHT || promo == W_BISHOP || promo == W_ROOK || promo == W_QUEEN
+        };
+        promo == 0
+    }
+
+    /// Full legality: ownership, geometry, promotion argument, and king
+    /// safety after a scratch apply.
+    public fun is_legal(pos: &Position, from: u8, to_sq: u8, promo: u8): bool {
+        if (from == to_sq) return false;
+        let piece = piece_at(&pos.board, from);
+        if (!is_own_piece(pos.side_to_move, piece)) return false;
+        if (!validate_geometry(pos, from, to_sq)) return false;
+        if (!promo_valid(piece, to_sq, promo)) return false;
+        let next = apply_move(pos, from, to_sq, promo);
+        !in_check(&next, pos.side_to_move)
+    }
+
+    /// Validate + apply + evaluate in one call; aborts E_INVALID_MOVE on an
+    /// illegal move or bad promotion argument.
+    public fun make_move(pos: &Position, from: u8, to_sq: u8, promo: u8): (Position, u8) {
+        assert!(is_legal(pos, from, to_sq, promo), E_INVALID_MOVE);
+        let next = apply_move(pos, from, to_sq, promo);
+        let outcome = evaluate_terminal(&next);
+        (next, outcome)
+    }
+
+    /// Wire format for clients: from(6b) << 10 | to(6b) << 4 | promo(4b).
+    public fun pack_move(from: u8, to_sq: u8, promo: u8): u16 {
+        (((from as u16) << 10) | ((to_sq as u16) << 4)) | (promo as u16)
+    }
+
+    public fun unpack_move(m: u16): (u8, u8, u8) {
+        ((((m >> 10) & 63) as u8), (((m >> 4) & 63) as u8), (m & 15) as u8)
+    }
+
+    fun option_is_none_or_eq(o: &Option<u8>, v: u8): bool {
+        if (option::is_none(o)) true else *option::borrow(o) == v
+    }
+
+    /// Every legal move for the side to move, optionally restricted to one
+    /// origin square. The 64x64 candidate scan is deliberate: simple, and far
+    /// under gas limits at this board size.
+    public fun legal_moves(pos: &Position, from_filter: &Option<u8>): vector<u16> {
+        let out = vector[];
+        let side = pos.side_to_move;
+        let from: u8 = 0;
+        while ((from as u64) < BOARD_SIZE) {
+            if (option_is_none_or_eq(from_filter, from)
+                && is_own_piece(side, piece_at(&pos.board, from))) {
+                let to_sq: u8 = 0;
+                while ((to_sq as u64) < BOARD_SIZE) {
+                    if (is_legal(pos, from, to_sq, 0)) {
+                        vector::push_back(&mut out, pack_move(from, to_sq, 0));
+                    } else if (validate_geometry(pos, from, to_sq)
+                        && promo_required(&pos.board, from, to_sq)) {
+                        // Promotions enumerate one packed entry per piece.
+                        let pieces = vector[W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN];
+                        let i: u64 = 0;
+                        while (i < 4) {
+                            let pc = *vector::borrow(&pieces, i);
+                            if (is_legal(pos, from, to_sq, pc)) {
+                                vector::push_back(&mut out, pack_move(from, to_sq, pc));
+                            };
+                            i = i + 1;
+                        };
+                    };
+                    to_sq = to_sq + 1;
+                };
+            };
+            from = from + 1;
+        };
+        out
+    }
+
+    /// Early-exit variant used by terminal detection.
+    public fun has_any_legal_move(pos: &Position): bool {
+        let side = pos.side_to_move;
+        let from: u8 = 0;
+        while ((from as u64) < BOARD_SIZE) {
+            if (is_own_piece(side, piece_at(&pos.board, from))) {
+                let to_sq: u8 = 0;
+                while ((to_sq as u64) < BOARD_SIZE) {
+                    if (is_legal(pos, from, to_sq, 0)) return true;
+                    if (validate_geometry(pos, from, to_sq)
+                        && promo_required(&pos.board, from, to_sq)) {
+                        let pieces = vector[W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN];
+                        let i: u64 = 0;
+                        while (i < 4) {
+                            if (is_legal(pos, from, to_sq, *vector::borrow(&pieces, i))) return true;
+                            i = i + 1;
+                        };
+                    };
+                    to_sq = to_sq + 1;
+                };
+            };
+            from = from + 1;
+        };
+        false
+    }
+
+    /// Dead-position census: no pawns/rooks/queens and at most one minor
+    /// piece in total (K v K and K+minor v K draw; K+N+N stays playable).
+    public fun insufficient_material(board: &vector<u8>): bool {
+        let minors: u64 = 0;
+        let i: u64 = 0;
+        while (i < BOARD_SIZE) {
+            let p = *vector::borrow(board, i);
+            if (p == W_PAWN || p == B_PAWN || p == W_ROOK || p == B_ROOK
+                || p == W_QUEEN || p == B_QUEEN) return false;
+            if (p == W_KNIGHT || p == B_KNIGHT || p == W_BISHOP || p == B_BISHOP) {
+                minors = minors + 1;
+            };
+            i = i + 1;
+        };
+        minors <= 1
+    }
+
+    /// Terminal evaluation for the position AFTER a move (side_to_move is the
+    /// player now on turn). Precedence per spec: mate > stalemate >
+    /// insufficient material > fifty-move — mate beats a spent clock.
+    public fun evaluate_terminal(next: &Position): u8 {
+        if (!has_any_legal_move(next)) {
+            if (in_check(next, next.side_to_move)) {
+                return if (next.side_to_move == WHITE) OUTCOME_BLACK_MATED else OUTCOME_WHITE_MATED
+            };
+            return OUTCOME_STALEMATE
+        };
+        if (insufficient_material(&next.board)) return OUTCOME_INSUFFICIENT;
+        if (next.halfmove_clock >= 100) return OUTCOME_FIFTY_MOVE;
+        OUTCOME_ONGOING
+    }
+
+
+    #[test]
+    fun test_pin_blocks_leaving_the_line() {
+        let board = empty_board();
+        place(&mut board, 60, W_KING); // e1
+        place(&mut board, 61, W_ROOK); // f1 pinned by...
+        place(&mut board, 5, B_ROOK);  // ...f8
+        place(&mut board, 4, B_KING);
+        let pos = pos_with(board);
+        assert!(is_legal(&pos, 61, 53, 0), 0);  // Rf2 stays on the pin line
+        assert!(is_legal(&pos, 61, 37, 0), 0);  // Rf4 also on the line
+        assert!(!is_legal(&pos, 61, 59, 0), 0); // Rd1 abandons the pin
+        assert!(!is_legal(&pos, 61, 33, 0), 0); // Ra4? not rook-shaped anyway; rank4 off-line
+    }
+
+    #[test]
+    fun test_king_cannot_move_into_check() {
+        let board = empty_board();
+        place(&mut board, 60, W_KING); // e1
+        place(&mut board, 52, B_ROOK); // e2 attacks the e-file
+        place(&mut board, 43, B_PAWN); // d3 defends e2
+        place(&mut board, 4, B_KING);
+        let pos = pos_with(board);
+        assert!(!is_legal(&pos, 60, 52, 0), 0); // Kxe2 walks into the pawn
+        assert!(is_legal(&pos, 60, 59, 0), 0);  // Kd1 safe
+        assert!(!is_legal(&pos, 60, 44, 0), 0); // Ke3? into e-file check... wait: e-file square
+    }
+
+    #[test]
+    fun test_ep_capture_exposing_rank_is_illegal() {
+        // Ka4(32), Pb4(33), black just played c7-c5 (pawn c5=26, ep target c6=18),
+        // Rh4(39) pins along rank 4. Both the ep capture AND the plain b5 push
+        // abandon rank 4; only stepping the king away keeps the game sane.
+        let board = empty_board();
+        place(&mut board, 32, W_KING);
+        place(&mut board, 33, W_PAWN);
+        place(&mut board, 26, B_PAWN); // c5
+        place(&mut board, 39, B_ROOK); // h4
+        place(&mut board, 4, B_KING);
+        let pos = pos_with(board);
+        pos.ep_square = 18;
+        assert!(!is_legal(&pos, 33, 18, 0), 0); // bxc6 ep exposes Ka4
+        assert!(!is_legal(&pos, 33, 25, 0), 0); // ordinary b5 push too
+        assert!(is_legal(&pos, 32, 40, 0), 0);  // Ka3 steps off rank 4
+    }
+
+    #[test]
+    fun test_promo_argument_validation() {
+        let board = empty_board();
+        place(&mut board, 9, W_PAWN); // true b7 (row 1); b8 is square 1
+        place(&mut board, 4, B_KING);
+        place(&mut board, 60, W_KING);
+        let pos = pos_with(board);
+        assert!(promo_required(&board, 9, 1), 0);
+        assert!(!is_legal(&pos, 9, 1, 0), 0);      // missing promo arg
+        assert!(!is_legal(&pos, 9, 1, W_PAWN), 0); // pawn is not a promo piece
+        assert!(!is_legal(&pos, 9, 1, W_KING), 0); // neither is king
+        assert!(is_legal(&pos, 9, 1, W_QUEEN), 0);
+        assert!(is_legal(&pos, 9, 1, W_KNIGHT), 0); // underpromotion ok
+        // Promo arg away from the last rank is rejected.
+        let b2 = empty_board();
+        place(&mut b2, 52, W_PAWN);
+        place(&mut b2, 4, B_KING);
+        place(&mut b2, 60, W_KING);
+        let pos2 = pos_with(b2);
+        assert!(!promo_required(&pos2.board, 52, 44), 0);
+        assert!(!is_legal(&pos2, 52, 44, W_KNIGHT), 0);
+        assert!(is_legal(&pos2, 52, 44, 0), 0);
+    }
+
+    #[test]
+    fun test_start_position_has_twenty_moves() {
+        let pos = start_position();
+        let moves = legal_moves(&pos, &option::none());
+        assert!(vector::length(&moves) == 20, 0);
+        let a_moves = legal_moves(&pos, &option::some(48));
+        assert!(vector::length(&a_moves) == 2, 0); // a3 / a4
+        let (f, t, p) = unpack_move(*vector::borrow(&a_moves, 0));
+        assert!(f == 48 && p == 0 && (t == 40 || t == 32), 0);
+        // Packing round-trips.
+        let packed = pack_move(52, 36, W_QUEEN);
+        let (f2, t2, p2) = unpack_move(packed);
+        assert!(f2 == 52 && t2 == 36 && p2 == W_QUEEN, 0);
+    }
+
+    #[test]
+    fun test_scholars_mate_is_mate() {
+        let pos0 = start_position();
+        let p1 = apply_move(&pos0, 52, 36, 0); // 1. e4
+        let p2 = apply_move(&p1, 12, 28, 0);   // 1... e5
+        let p3 = apply_move(&p2, 61, 34, 0);   // 2. Bc4
+        let p4 = apply_move(&p3, 1, 18, 0);    // 2... Nc6
+        let p5 = apply_move(&p4, 59, 31, 0);   // 3. Qh5
+        let p6 = apply_move(&p5, 6, 21, 0);    // 3... Nf6
+        let (p7, outcome) = make_move(&p6, 31, 13, W_QUEEN - W_QUEEN); // 4. Qxf7# (promo arg must be 0!)
+        let _ = outcome;
+        assert!(evaluate_terminal(&p7) == OUTCOME_WHITE_MATED, 0);
+        assert!(outcome != OUTCOME_ONGOING, 0);
+    }
+
+    #[test]
+    fun test_stalemate_detection() {
+        // Black king h8(7); white queen g6(22) covers g7/g8/h7 but not h8.
+        let board = empty_board();
+        place(&mut board, 7, B_KING);
+        place(&mut board, 22, W_QUEEN);
+        place(&mut board, 56, W_KING);
+        let pos = pos_with(board);
+        pos.side_to_move = BLACK;
+        assert!(evaluate_terminal(&pos) == OUTCOME_STALEMATE, 0);
+    }
+
+    #[test]
+    fun test_insufficient_material_boundaries() {
+        let board = empty_board();
+        place(&mut board, 60, W_KING);
+        place(&mut board, 4, B_KING);
+        let pos = pos_with(board);
+        assert!(insufficient_material(&board), 0);
+        place(&mut board, 0, W_BISHOP);
+        assert!(insufficient_material(&board), 0);  // KB v K
+        set_at(&mut board, 0, 0, W_KNIGHT);
+        assert!(insufficient_material(&board), 0);  // KN v K
+        place(&mut board, 7, B_KNIGHT);
+        assert!(piece_at(&board, 0) == W_KNIGHT && piece_at(&board, 7) == B_KNIGHT, 310);
+        assert!(!insufficient_material(&board), 0); // two knights: playable
+        set_at(&mut board, 7, 0, B_PAWN);
+        assert!(!insufficient_material(&board), 0); // pawn present
+        place(&mut board, 7, B_ROOK);
+        assert!(!insufficient_material(&board), 0); // rook present
+    }
+
+    #[test]
+    fun test_fifty_move_and_mate_precedence() {
+        // Clock hits 100 after a quiet king move -> fifty-move draw.
+        let board = empty_board();
+        place(&mut board, 3, B_KING);   // d8
+        place(&mut board, 16, B_PAWN);  // a7 keeps material sufficient
+        place(&mut board, 56, W_KING);
+        let pos = pos_with(board);
+        pos.side_to_move = BLACK;
+        pos.halfmove_clock = 99;
+        let (after, outcome) = make_move(&pos, 3, 2, 0); // Kd8-c8
+        assert!(after.halfmove_clock == 100, 0);
+        assert!(outcome == OUTCOME_FIFTY_MOVE, 0);
+        // Mate on the same ply beats the clock: back-rank Re8# with clock 99.
+        let c = empty_board();
+        place(&mut c, 7, B_KING);
+        place(&mut c, 14, B_PAWN); // g7
+        place(&mut c, 15, B_PAWN); // h7
+        place(&mut c, 60, W_ROOK); // e1
+        place(&mut c, 56, W_KING);
+        let pos3 = pos_with(c);
+        pos3.halfmove_clock = 99;
+        let next3 = apply_move(&pos3, 60, 4, 0); // Re8#
+        assert!(in_check(&next3, BLACK), 320);
+        assert!(!has_any_legal_move(&next3), 321);
+        // White delivered mate, so the winner-named outcome is WHITE_MATED
+        // even though BLACK is the side left without moves.
+        assert!(evaluate_terminal(&next3) == OUTCOME_WHITE_MATED, 0);
+    }
+
 }
