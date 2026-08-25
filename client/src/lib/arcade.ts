@@ -6,6 +6,7 @@ export enum GameKind {
   TicTacToe = 1,
   Checkers = 2,
   Backgammon = 3,
+  ChineseCheckers = 4,
 }
 
 export enum GamePhase {

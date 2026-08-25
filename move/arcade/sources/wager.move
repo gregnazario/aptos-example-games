@@ -12,11 +12,13 @@ module arcade::wager {
     use std::option;
     use arcade::hub;
 
-    // Game modules arriving in phases 1-3. Declared now because the package
-    // publishes immutably — friends cannot be added after the fact.
+    // Game modules arriving in phases 1-3, plus chinese_checkers reserved
+    // post-phase-3. Declared now because the package publishes immutably —
+    // friends cannot be added after the fact.
     friend arcade::tic_tac_toe_v2;
     friend arcade::checkers_v2;
     friend arcade::backgammon;
+    friend arcade::chinese_checkers;
 
     const PHASE_OPEN: u8 = 0;
     const PHASE_IN_PROGRESS: u8 = 1;
@@ -25,6 +27,7 @@ module arcade::wager {
     public const KIND_TIC_TAC_TOE: u8 = 1;
     public const KIND_CHECKERS: u8 = 2;
     public const KIND_BACKGAMMON: u8 = 3;
+    public const KIND_CHINESE_CHECKERS: u8 = 4;
 
     /// Maximum display-name length; the name doubles as the object seed.
     const METADATA_MAX_LENGTH: u64 = 64;
@@ -86,7 +89,10 @@ module arcade::wager {
     ): ConstructorRef {
         assert!(stake > 0, E_ZERO_STAKE);
         assert!(
-            kind == KIND_TIC_TAC_TOE || kind == KIND_CHECKERS || kind == KIND_BACKGAMMON,
+            kind == KIND_TIC_TAC_TOE
+                || kind == KIND_CHECKERS
+                || kind == KIND_BACKGAMMON
+                || kind == KIND_CHINESE_CHECKERS,
             E_WRONG_KIND
         );
         assert!(string::length(&metadata) > 0, E_METADATA_EMPTY);
@@ -640,6 +646,17 @@ module arcade::wager {
         hub::initialize(deployer);
         let ctor = create_game(creator, 99, 100, string::utf8(b"k"));
         let _ = ctor;
+    }
+
+    #[test(creator = @0xCC, deployer = @arcade)]
+    fun test_create_chinese_checkers_kind_lists_in_hub(creator: &signer, deployer: &signer) {
+        setup_coin_and_player(@0xCC, 10_000_000);
+        hub::initialize(deployer);
+        let ctor = create_game(creator, KIND_CHINESE_CHECKERS, 100, string::utf8(b"cc"));
+        let _ = ctor;
+        let game_addr = last_game_address(@0xCC, b"cc");
+        assert!(kind(game_addr) == KIND_CHINESE_CHECKERS);
+        assert!(vector::length(&hub::open_games(KIND_CHINESE_CHECKERS)) == 1);
     }
 
     #[test(creator = @0xF2, deployer = @arcade)]
