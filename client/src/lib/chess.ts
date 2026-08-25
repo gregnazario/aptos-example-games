@@ -88,6 +88,14 @@ export async function getLegalMoves(
   return (Array.isArray(moves) ? moves : []).map((m) => unpackMove(Number(m)));
 }
 
+/** Mirrors wager::timeout_seconds — 3 days of inactivity. */
+export const FORFEIT_SECONDS = 259_200;
+
+export async function getSecondsSinceLastMove(address: string): Promise<number> {
+  const [seconds] = await view<bigint>("wager::time_since_last_move", [address]);
+  return Number(seconds ?? 0);
+}
+
 // Same packing as chess_rules::pack_move: from(6b) << 10 | to(6b) << 4 | promo(4b).
 export function unpackMove(packed: number): PackedMove {
   return {
