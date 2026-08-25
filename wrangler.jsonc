@@ -12,6 +12,10 @@
     "directory": "client/.output/public"
   },
   "no_bundle": true,
+  "build": {
+    "command": "npm run build",
+    "cwd": "."
+  },
   "rules": [
     {
       "type": "ESModule",
